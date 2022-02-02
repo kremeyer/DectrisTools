@@ -1,0 +1,4 @@
+setuptools>=44.0.0
+numpy~=1.22.1
+PyQt5~=5.15.6
+pyqtgraph~=0.12.3
