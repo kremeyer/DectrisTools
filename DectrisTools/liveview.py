@@ -1,7 +1,7 @@
 import logging as log
 from PyQt5 import QtWidgets
 from argparse import ArgumentParser
-from DectrisTools.ui.liveview import LiveViewUi
+from .ui.liveview import LiveViewUi
 
 
 def parse_args():

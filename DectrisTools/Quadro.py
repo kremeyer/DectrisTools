@@ -1,5 +1,5 @@
 import numpy as np
-from DectrisTools.lib.DEigerClient import DEigerClient
+from .lib.DEigerClient import DEigerClient
 
 CONFIGS_READ = ['description',
                 'detector_number',

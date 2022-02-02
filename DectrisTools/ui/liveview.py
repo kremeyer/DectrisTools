@@ -2,8 +2,8 @@ from os import path
 import logging as log
 import numpy as np
 from PyQt5 import QtWidgets, QtCore, uic
-from DectrisTools.lib.Utils import DectrisGrabber
-from DectrisTools import get_base_path
+from ..lib.Utils import DectrisGrabber
+from .. import get_base_path
 
 
 class LiveViewUi(QtWidgets.QMainWindow):
