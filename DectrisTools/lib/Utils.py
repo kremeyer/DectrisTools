@@ -1,8 +1,10 @@
 from time import sleep
 import logging as log
+import io
 import pyqtgraph as pg
 from PyQt5.QtCore import pyqtSignal, QObject, QThread
 import numpy as np
+from PIL import Image
 from ..Quadro import Quadro
 
 
@@ -42,21 +44,28 @@ class LiveViewWidget(pg.ImageView):
         self.cursor_changed.emit((x, y))
 
 
-class DectrisGrabber(QObject):
+class DectrisImageGrabber(QObject):
     image_ready = pyqtSignal(np.ndarray)
 
     def __init__(self, ip, port):
         super().__init__()
 
         self.Q = Quadro(ip, port)
+        if self.Q.state == 'na':
+            log.warning('Detector need to be initialized, that may take a while...')
+            self.Q.initialize()
+        self.Q.mon.clear()
+        self.Q.fw.clear()
 
-        # self.Q.fw.mode = 'disabled'
-        # self.Q.incident_energy = 1e5
-        # self.Q.count_time = 0.3
-        # self.Q.frame_time = 0.3
-        # self.Q.n_images = 1
-        # self.Q.n_trigger = 1
+        self.Q.fw.mode = 'disabled'
+        self.Q.mon.mode = 'enabled'
+        self.Q.incident_energy = 1e5
+        self.Q.count_time = 10
+        self.Q.frame_time = 10
+        self.Q.n_images = 1
+        self.Q.n_trigger = 1
         # self.Q.trigger_mode = 'exte'
+        self.Q.trigger_mode = 'ints'
 
         self.image_grabber_thread = QThread()
         self.moveToThread(self.image_grabber_thread)
@@ -68,17 +77,35 @@ class DectrisGrabber(QObject):
 
     def __get_image(self):
         log.debug(f'started image_grabber_thread {self.image_grabber_thread.currentThread()}')
-        sleep(1)
-        self.image_ready.emit(np.random.rand(512, 512) * 2**16)
+        # sleep(1)
+        # self.image_ready.emit(np.random.rand(512, 512) * 2**16)
 
-        # self.Q.arm()
-        # while not self.Q.state == 'idle':
-        #     sleep(0.05)
-        # self.Q.disarm()
-        # while not self.Q.mon.image_list:
-        #     sleep(0.05)
-        # self.image_ready.emit(self.Q.mon.last_image)
-        # self.Q.mon.clear()
+        self.Q.arm()
+        self.Q.trigger()
+        while not self.Q.state == 'idle':
+            sleep(0.05)
+        self.Q.disarm()
+        while not self.Q.mon.image_list:
+            sleep(0.05)
+        # image comes as a file-like object in tif format
+        self.image_ready.emit(np.array(Image.open(io.BytesIO(self.Q.mon.last_image))))
+        self.Q.mon.clear()
 
         self.image_grabber_thread.quit()
         log.debug(f'quit image_grabber_thread {self.image_grabber_thread.currentThread()}')
+
+
+class DectrisStatusGrabber(QObject):
+    status_ready = pyqtSignal(dict)
+
+    def __init__(self, ip, port):
+        super().__init__()
+
+        self.Q = Quadro(ip, port)
+
+        self.status_grabber_thread = QThread()
+        self.moveToThread(self.status_grabber_thread)
+        self.status_grabber_thread.started.connect(self.__get_status)
+
+    def __get_status(self):
+        return {'quadro': self.Q.state, 'fw': self.Q.fw.state, 'mon': self.Q.mon.state}

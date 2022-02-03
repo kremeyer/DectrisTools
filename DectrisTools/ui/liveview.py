@@ -2,7 +2,7 @@ from os import path
 import logging as log
 import numpy as np
 from PyQt5 import QtWidgets, QtCore, uic
-from ..lib.Utils import DectrisGrabber
+from ..lib.Utils import DectrisImageGrabber
 from .. import get_base_path
 
 
@@ -17,7 +17,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
         self.viewer.cursor_changed.connect(self.update_statusbar)
 
-        self.dectris_grabber = DectrisGrabber(cmd_args.ip, cmd_args.port)
+        self.dectris_grabber = DectrisImageGrabber(cmd_args.ip, cmd_args.port)
         self.dectris_grabber.image_ready.connect(self.update_image)
 
         self.timer = QtCore.QTimer()
