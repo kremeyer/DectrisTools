@@ -46,26 +46,36 @@ class LiveViewWidget(pg.ImageView):
 
 class DectrisImageGrabber(QObject):
     image_ready = pyqtSignal(np.ndarray)
+    connected = False
 
     def __init__(self, ip, port):
         super().__init__()
 
         self.Q = Quadro(ip, port)
-        if self.Q.state == 'na':
-            log.warning('Detector need to be initialized, that may take a while...')
-            self.Q.initialize()
-        self.Q.mon.clear()
-        self.Q.fw.clear()
+        try:
+            _ = self.Q.state
+            self.connected = True
+            log.info('successfully connected to detector')
+            log.info(self.Q)
+        except OSError:
+            log.warning('could not establish connection to detector')
 
-        self.Q.fw.mode = 'disabled'
-        self.Q.mon.mode = 'enabled'
-        self.Q.incident_energy = 1e5
-        self.Q.count_time = 10
-        self.Q.frame_time = 10
-        self.Q.n_images = 1
-        self.Q.n_trigger = 1
-        # self.Q.trigger_mode = 'exte'
-        self.Q.trigger_mode = 'ints'
+        if self.connected:
+            if self.Q.state == 'na':
+                log.warning('Detector need to be initialized, that may take a while...')
+                self.Q.initialize()
+            self.Q.mon.clear()
+            self.Q.fw.clear()
+
+            self.Q.fw.mode = 'disabled'
+            self.Q.mon.mode = 'enabled'
+            self.Q.incident_energy = 1e5
+            self.Q.count_time = 10
+            self.Q.frame_time = 10
+            self.Q.n_images = 1
+            self.Q.n_trigger = 1
+            # self.Q.trigger_mode = 'exte'
+            self.Q.trigger_mode = 'ints'
 
         self.image_grabber_thread = QThread()
         self.moveToThread(self.image_grabber_thread)
@@ -77,19 +87,21 @@ class DectrisImageGrabber(QObject):
 
     def __get_image(self):
         log.debug(f'started image_grabber_thread {self.image_grabber_thread.currentThread()}')
-        # sleep(1)
-        # self.image_ready.emit(np.random.rand(512, 512) * 2**16)
 
-        self.Q.arm()
-        self.Q.trigger()
-        while not self.Q.state == 'idle':
-            sleep(0.05)
-        self.Q.disarm()
-        while not self.Q.mon.image_list:
-            sleep(0.05)
-        # image comes as a file-like object in tif format
-        self.image_ready.emit(np.array(Image.open(io.BytesIO(self.Q.mon.last_image))))
-        self.Q.mon.clear()
+        if self.connected:
+            self.Q.arm()
+            self.Q.trigger()
+            while not self.Q.state == 'idle':
+                sleep(0.05)
+            self.Q.disarm()
+            while not self.Q.mon.image_list:
+                sleep(0.05)
+            # image comes as a file-like object in tif format
+            self.image_ready.emit(np.array(Image.open(io.BytesIO(self.Q.mon.last_image))))
+            self.Q.mon.clear()
+        else:
+            sleep(1)
+            self.image_ready.emit(np.random.rand(512, 512) * 2**16)
 
         self.image_grabber_thread.quit()
         log.debug(f'quit image_grabber_thread {self.image_grabber_thread.currentThread()}')
