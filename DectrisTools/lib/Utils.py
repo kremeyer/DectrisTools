@@ -72,18 +72,15 @@ class DectrisImageGrabber(QObject):
             self.Q.incident_energy = 1e5
             self.Q.count_time = 10
             self.Q.frame_time = 10
-            self.Q.n_images = 1
-            self.Q.n_trigger = 1
-            # self.Q.trigger_mode = 'exte'
-            self.Q.trigger_mode = 'ints'
 
         self.image_grabber_thread = QThread()
         self.moveToThread(self.image_grabber_thread)
         self.image_grabber_thread.started.connect(self.__get_image)
 
     def __del__(self):
-        self.Q.mon.clear()
-        self.Q.disarm()
+        if self.connected:
+            self.Q.mon.clear()
+            self.Q.disarm()
 
     def __get_image(self):
         log.debug(f'started image_grabber_thread {self.image_grabber_thread.currentThread()}')
@@ -100,7 +97,7 @@ class DectrisImageGrabber(QObject):
             self.image_ready.emit(np.array(Image.open(io.BytesIO(self.Q.mon.last_image))))
             self.Q.mon.clear()
         else:
-            sleep(1)
+            sleep(5)
             self.image_ready.emit(np.random.rand(512, 512) * 2**16)
 
         self.image_grabber_thread.quit()
