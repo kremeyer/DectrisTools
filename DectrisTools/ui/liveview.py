@@ -1,5 +1,4 @@
 from os import path
-from time import sleep
 import logging as log
 import numpy as np
 from PyQt5 import QtWidgets, QtCore, QtGui, uic
