@@ -2,7 +2,7 @@ from os import path
 import logging as log
 import numpy as np
 from PyQt5 import QtWidgets, QtCore, QtGui, uic
-from ..lib.Utils import DectrisImageGrabber, DectrisStatusGrabber, VLine, interrupt_liveview
+from ..lib.Utils import DectrisImageGrabber, DectrisStatusGrabber, interrupt_liveview
 from .. import get_base_path
 
 
@@ -17,7 +17,9 @@ class LiveViewUi(QtWidgets.QMainWindow):
         uic.loadUi(path.join(get_base_path(), 'ui/liveview.ui'), self)
         self.update_interval = cmd_args.update_interval
 
-        self.dectris_image_grabber = DectrisImageGrabber(cmd_args.ip, cmd_args.port)
+        self.dectris_image_grabber = DectrisImageGrabber(cmd_args.ip, cmd_args.port,
+                                                         trigger_mode=self.comboBoxTriggerMode.currentText(),
+                                                         exposure=self.spinBoxExposure.value()/1000)
         self.dectris_status_grabber = DectrisStatusGrabber(cmd_args.ip, cmd_args.port)
 
         self.image_timer = QtCore.QTimer()
@@ -34,9 +36,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.labelExposure = QtWidgets.QLabel()
 
         self.comboBoxTriggerMode.currentIndexChanged.connect(self.update_trigger_mode)
-        self.update_trigger_mode()
         self.spinBoxExposure.valueChanged.connect(self.update_exposure)
-        self.update_exposure()
 
         self.init_statusbar()
 
@@ -48,7 +48,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
     def init_statusbar(self):
         self.viewer.cursor_changed.connect(self.update_label_intensity)
 
-        status_label_font = QtGui.QFont('Courier', 11)
+        status_label_font = QtGui.QFont('Courier', 9)
         self.labelIntensity.setFont(status_label_font)
         self.labelState.setFont(status_label_font)
         self.labelTrigger.setFont(status_label_font)
@@ -57,7 +57,6 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.labelIntensity.setText(f'({"":>4s}, {"":>4s})   {"":>{self.i_digits}s}')
 
         self.statusbar.addPermanentWidget(self.labelIntensity)
-        self.statusbar.addPermanentWidget(VLine())
         self.statusbar.addPermanentWidget(self.labelState)
         self.statusbar.addPermanentWidget(self.labelTrigger)
         self.statusbar.addPermanentWidget(self.labelExposure)
@@ -80,7 +79,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
             self.labelTrigger.setText(f'Trigger: {states["trigger_mode"]:>4s}')
             if states['trigger_mode'] == 'exts':
                 self.labelExposure.setText('Exposure:   trig ')
-            self.labelExposure.setText(f'Exposure: {"":>5s}ms')
+            self.labelExposure.setText(f'Exposure: {states["exposure"]*1000:>5.0f}ms')
 
     def update_image(self, image):
         self.image = image
@@ -104,7 +103,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
     @interrupt_liveview
     def update_exposure(self):
-        time = self.spinBoxExposure.value()
+        time = self.spinBoxExposure.value()/1000
         log.info(f'changing exporue time to {time}')
         if self.dectris_image_grabber.connected:
             self.dectris_image_grabber.Q.count_time = time
