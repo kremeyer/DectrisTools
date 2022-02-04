@@ -3,6 +3,7 @@ import logging as log
 import io
 import pyqtgraph as pg
 from PyQt5.QtCore import pyqtSignal, QObject, QThread
+from PyQt5.QtWidgets import QFrame
 import numpy as np
 from PIL import Image
 from ..Quadro import Quadro
@@ -55,10 +56,10 @@ class DectrisImageGrabber(QObject):
         try:
             _ = self.Q.state
             self.connected = True
-            log.info('successfully connected to detector')
+            log.info('DectrisImageGrabber successfully connected to detector')
             log.info(self.Q)
         except OSError:
-            log.warning('could not establish connection to detector')
+            log.warning('DectrisImageGrabber could not establish connection to detector')
 
         if self.connected:
             if self.Q.state == 'na':
@@ -97,7 +98,7 @@ class DectrisImageGrabber(QObject):
             self.image_ready.emit(np.array(Image.open(io.BytesIO(self.Q.mon.last_image))))
             self.Q.mon.clear()
         else:
-            sleep(5)
+            sleep(1)
             self.image_ready.emit(np.random.rand(512, 512) * 2**16)
 
         self.image_grabber_thread.quit()
@@ -106,15 +107,57 @@ class DectrisImageGrabber(QObject):
 
 class DectrisStatusGrabber(QObject):
     status_ready = pyqtSignal(dict)
+    connected = False
 
     def __init__(self, ip, port):
         super().__init__()
 
         self.Q = Quadro(ip, port)
+        try:
+            _ = self.Q.state
+            self.connected = True
+            log.info('DectrisStatusGrabber successfully connected to detector')
+            log.info(self.Q)
+        except OSError:
+            log.warning('DectrisStatusGrabber could not establish connection to detector')
 
         self.status_grabber_thread = QThread()
         self.moveToThread(self.status_grabber_thread)
         self.status_grabber_thread.started.connect(self.__get_status)
 
     def __get_status(self):
-        return {'quadro': self.Q.state, 'fw': self.Q.fw.state, 'mon': self.Q.mon.state}
+        log.debug(f'started status_grabber_thread {self.status_grabber_thread.currentThread()}')
+        if self.connected:
+            self.status_ready.emit({'quadro': self.Q.state, 'fw': self.Q.fw.state, 'mon': self.Q.mon.state,
+                                    'trigger_mode': self.Q.trigger_mode, 'exposure': self.Q.frame_time})
+        else:
+            self.status_ready.emit({'quadro': None, 'fw': None, 'mon': None, 'trigger_mode': None, 'exposure': None})
+        self.status_grabber_thread.quit()
+        log.debug(f'quit status_grabber_thread {self.status_grabber_thread.currentThread()}')
+
+
+class VLine(QFrame):
+    def __init__(self):
+        super().__init__()
+        self.setFrameShape(self.VLine | self.Sunken)
+
+
+def interrupt_liveview(f):
+    def wrapper(self):
+        log.debug('stopping liveview')
+        self.image_timer.stop()
+        log.debug('waiting for image grabing thread to finish')
+        # wait 2*exposure time for detector to finish; otherwise abort
+        if self.dectris_image_grabber.connected:
+            for _ in range(int(self.dectris_image_grabber.Q.frame_time)):
+                if self.dectris_image_grabber.image_grabber_thread.isFinished():
+                    break
+                sleep(0.002)
+            if not self.dectris_image_grabber.image_grabber_thread.isFinished():
+                log.warning('image grabbing thread does not seem to finish, aborting acquisition')
+                if self.dectris_image_grabber.connected:
+                    self.dectris_image_grabber.Q.abort()
+        f(self)
+        log.debug('restarting liveview')
+        self.image_timer.start(self.update_interval)
+    return wrapper
