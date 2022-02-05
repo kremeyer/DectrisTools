@@ -2,7 +2,7 @@ from os import path
 import logging as log
 import numpy as np
 from PyQt5 import QtWidgets, QtCore, QtGui, uic
-from ..lib.Utils import DectrisImageGrabber, DectrisStatusGrabber, interrupt_liveview
+from ..lib.Utils import DectrisImageGrabber, DectrisStatusGrabber, ExposureProgressWorker, interrupt_liveview
 from .. import get_base_path
 
 
@@ -21,6 +21,8 @@ class LiveViewUi(QtWidgets.QMainWindow):
                                                          trigger_mode=self.comboBoxTriggerMode.currentText(),
                                                          exposure=float(self.lineEditExposure.text())/1000)
         self.dectris_status_grabber = DectrisStatusGrabber(cmd_args.ip, cmd_args.port)
+        self.exposure_progress_worker = ExposureProgressWorker()
+        self.dectris_image_grabber.exposure_triggered.connect(self.exposure_progress_worker.progress_thread.start)
 
         self.image_timer = QtCore.QTimer()
         self.image_timer.timeout.connect(self.dectris_image_grabber.image_grabber_thread.start)
@@ -29,6 +31,8 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.status_timer = QtCore.QTimer()
         self.status_timer.timeout.connect(self.dectris_status_grabber.status_grabber_thread.start)
         self.dectris_status_grabber.status_ready.connect(self.update_status_labels)
+
+        self.exposure_progress_worker.advance_progress_bar.connect(self.advance_progress_bar)
 
         self.labelIntensity = QtWidgets.QLabel()
         self.labelState = QtWidgets.QLabel()
@@ -39,6 +43,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.lineEditExposure.returnPressed.connect(self.update_exposure)
 
         self.init_statusbar()
+        self.reset_progress_bar()
 
         self.image_timer.start(self.update_interval)
         self.status_timer.start(200)
@@ -61,6 +66,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.statusbar.addPermanentWidget(self.labelTrigger)
         self.statusbar.addPermanentWidget(self.labelExposure)
 
+    @QtCore.pyqtSlot(tuple)
     def update_label_intensity(self, xy):
         if self.image is None or xy == (np.NaN, np.NaN):
             self.labelIntensity.setText(f'({"":>4s}, {"":>4s})   {"":>{self.i_digits}s}')
@@ -69,6 +75,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         i = self.image[x, y]
         self.labelIntensity.setText(f'({x:>4}, {y:>4}) I={i:>{self.i_digits}.0f}')
 
+    @QtCore.pyqtSlot(dict)
     def update_status_labels(self, states):
         if states['quadro'] is None:
             self.labelState.setText(f'Detector: {"":>7s} Monitor: {"":>7s}')
@@ -81,13 +88,17 @@ class LiveViewUi(QtWidgets.QMainWindow):
                 self.labelExposure.setText('Exposure:   trig ')
             self.labelExposure.setText(f'Exposure: {states["exposure"]*1000:>5.0f}ms')
 
+    @QtCore.pyqtSlot(np.ndarray)
     def update_image(self, image):
         self.image = image
         self.viewer.x_size, self.viewer.y_size = self.image.shape
         self.viewer.setImage(self.image, autoRange=False, autoLevels=False)
         self.i_digits = len(str(int(self.image.max(initial=1))))
         self.statusbar.showMessage('')
+        self.exposure_progress_worker.progress_thread.quit()
+        self.reset_progress_bar()
 
+    @QtCore.pyqtSlot()
     @interrupt_liveview
     def update_trigger_mode(self):
         mode = self.comboBoxTriggerMode.currentText()
@@ -101,6 +112,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         else:
             log.warning(f'could not change trigger mode, detector disconnected')
 
+    @QtCore.pyqtSlot()
     @interrupt_liveview
     def update_exposure(self):
         try:
@@ -115,3 +127,20 @@ class LiveViewUi(QtWidgets.QMainWindow):
             self.dectris_image_grabber.Q.frame_time = time
         else:
             log.warning(f'could not change exposure time, detector disconnected')
+
+    @QtCore.pyqtSlot()
+    def advance_progress_bar(self):
+        if self.progressBarExposure.value()+1 < self.progressBarExposure.maximum():
+            self.progressBarExposure.setValue(self.progressBarExposure.value()+1)
+
+    def reset_progress_bar(self):
+        if self.dectris_image_grabber.connected:
+            time = self.progressBarExposure.setMaximum(int(self.dectris_image_grabber.Q.frame_time*100))
+        else:
+            time = 500
+        self.progressBarExposure.setValue(0)
+        self.progressBarExposure.setMaximum(time)
+
+    @QtCore.pyqtSlot()
+    def start_acquisition(self):
+        self.dectris_image_grabber.image_grabber_thread.start()

@@ -2,8 +2,7 @@ from time import sleep
 import logging as log
 import io
 import pyqtgraph as pg
-from PyQt5.QtCore import pyqtSignal, QObject, QThread
-from PyQt5.QtWidgets import QFrame
+from PyQt5.QtCore import pyqtSignal, pyqtSlot, QObject, QThread
 import numpy as np
 from PIL import Image
 from ..Quadro import Quadro
@@ -28,6 +27,7 @@ class LiveViewWidget(pg.ImageView):
         self.proxy = pg.SignalProxy(self.scene.sigMouseMoved,
                                     rateLimit=60, slot=self.__callback_move)
 
+    @pyqtSlot(tuple)
     def __callback_move(self, evt):
         """
         callback function for mouse movement on image
@@ -47,6 +47,7 @@ class LiveViewWidget(pg.ImageView):
 
 class DectrisImageGrabber(QObject):
     image_ready = pyqtSignal(np.ndarray)
+    exposure_triggered = pyqtSignal()
     connected = False
 
     def __init__(self, ip, port, trigger_mode='ints', exposure=0.3):
@@ -84,12 +85,15 @@ class DectrisImageGrabber(QObject):
             self.Q.mon.clear()
             self.Q.disarm()
 
+    @pyqtSlot()
     def __get_image(self):
+
         log.debug(f'started image_grabber_thread {self.image_grabber_thread.currentThread()}')
 
         if self.connected:
             self.Q.arm()
             self.Q.trigger()
+            self.exposure_triggered.emit()
             while not self.Q.state == 'idle':
                 sleep(0.05)
             self.Q.disarm()
@@ -99,7 +103,8 @@ class DectrisImageGrabber(QObject):
             self.image_ready.emit(np.array(Image.open(io.BytesIO(self.Q.mon.last_image))))
             self.Q.mon.clear()
         else:
-            sleep(1)
+            self.exposure_triggered.emit()
+            sleep(5)
             self.image_ready.emit(np.random.rand(512, 512) * 2**16)
 
         self.image_grabber_thread.quit()
@@ -126,6 +131,7 @@ class DectrisStatusGrabber(QObject):
         self.moveToThread(self.status_grabber_thread)
         self.status_grabber_thread.started.connect(self.__get_status)
 
+    @pyqtSlot()
     def __get_status(self):
         log.debug(f'started status_grabber_thread {self.status_grabber_thread.currentThread()}')
         if self.connected:
@@ -135,6 +141,23 @@ class DectrisStatusGrabber(QObject):
             self.status_ready.emit({'quadro': None, 'fw': None, 'mon': None, 'trigger_mode': None, 'exposure': None})
         self.status_grabber_thread.quit()
         log.debug(f'quit status_grabber_thread {self.status_grabber_thread.currentThread()}')
+
+
+class ExposureProgressWorker(QObject):
+    advance_progress_bar = pyqtSignal()
+
+    def __init__(self):
+        super().__init__()
+
+        self.progress_thread = QThread()
+        self.moveToThread(self.progress_thread)
+        self.progress_thread.started.connect(self.__start_progress)
+
+    @pyqtSlot()
+    def __start_progress(self):
+        while True:
+            self.advance_progress_bar.emit()
+            sleep(0.01)
 
 
 def interrupt_liveview(f):
