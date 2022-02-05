@@ -19,7 +19,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
         self.dectris_image_grabber = DectrisImageGrabber(cmd_args.ip, cmd_args.port,
                                                          trigger_mode=self.comboBoxTriggerMode.currentText(),
-                                                         exposure=self.spinBoxExposure.value()/1000)
+                                                         exposure=float(self.lineEditExposure.text())/1000)
         self.dectris_status_grabber = DectrisStatusGrabber(cmd_args.ip, cmd_args.port)
 
         self.image_timer = QtCore.QTimer()
@@ -36,7 +36,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.labelExposure = QtWidgets.QLabel()
 
         self.comboBoxTriggerMode.currentIndexChanged.connect(self.update_trigger_mode)
-        self.spinBoxExposure.valueChanged.connect(self.update_exposure)
+        self.lineEditExposure.returnPressed.connect(self.update_exposure)
 
         self.init_statusbar()
 
@@ -92,9 +92,9 @@ class LiveViewUi(QtWidgets.QMainWindow):
     def update_trigger_mode(self):
         mode = self.comboBoxTriggerMode.currentText()
         if mode == 'exts':
-            self.spinBoxExposure.setEnabled(False)
+            self.lineEditExposure.setEnabled(False)
         else:
-            self.spinBoxExposure.setEnabled(True)
+            self.lineEditExposure.setEnabled(True)
         log.info(f'changing trigger mode to {mode}')
         if self.dectris_image_grabber.connected:
             self.dectris_image_grabber.Q.trigger_mode = mode
@@ -103,7 +103,12 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
     @interrupt_liveview
     def update_exposure(self):
-        time = self.spinBoxExposure.value()/1000
+        try:
+            time = float(self.lineEditExposure.text())/1000
+        except TypeError:
+            log.warning(f'setting exposure: cannot convert {self.lineEditExposure.text()} to float')
+            return
+
         log.info(f'changing exporue time to {time}')
         if self.dectris_image_grabber.connected:
             self.dectris_image_grabber.Q.count_time = time
