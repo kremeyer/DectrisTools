@@ -98,8 +98,8 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.exposure_progress_worker.progress_thread.quit()
         self.reset_progress_bar()
 
-    @QtCore.pyqtSlot()
     @interrupt_liveview
+    @QtCore.pyqtSlot()
     def update_trigger_mode(self):
         mode = self.comboBoxTriggerMode.currentText()
         if mode == 'exts':
@@ -112,12 +112,12 @@ class LiveViewUi(QtWidgets.QMainWindow):
         else:
             log.warning(f'could not change trigger mode, detector disconnected')
 
-    @QtCore.pyqtSlot()
     @interrupt_liveview
+    @QtCore.pyqtSlot()
     def update_exposure(self):
         try:
             time = float(self.lineEditExposure.text())/1000
-        except TypeError:
+        except (ValueError, TypeError):
             log.warning(f'setting exposure: cannot convert {self.lineEditExposure.text()} to float')
             return
 
