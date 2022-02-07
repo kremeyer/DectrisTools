@@ -92,10 +92,10 @@ class LiveViewUi(QtWidgets.QMainWindow):
     def update_image(self, image):
         self.image = image
         self.viewer.x_size, self.viewer.y_size = self.image.shape
-        self.viewer.setImage(self.image, autoRange=False, autoLevels=False)
+        self.viewer.setImage(self.image, autoRange=True, autoLevels=True)
         self.i_digits = len(str(int(self.image.max(initial=1))))
-        self.statusbar.showMessage('')
-        self.exposure_progress_worker.progress_thread.quit()
+        self.exposure_progress_worker.progress_thread.requestInterruption()
+        self.exposure_progress_worker.progress_thread.wait()
         self.reset_progress_bar()
 
     @interrupt_liveview
@@ -132,6 +132,8 @@ class LiveViewUi(QtWidgets.QMainWindow):
     def advance_progress_bar(self):
         if self.progressBarExposure.value()+1 < self.progressBarExposure.maximum():
             self.progressBarExposure.setValue(self.progressBarExposure.value()+1)
+        else:
+            self.progressBarExposure.setValue(self.progressBarExposure.maximum())
 
     def reset_progress_bar(self):
         if self.dectris_image_grabber.connected:
@@ -139,7 +141,8 @@ class LiveViewUi(QtWidgets.QMainWindow):
         else:
             time = 500
         self.progressBarExposure.setValue(0)
-        self.progressBarExposure.setMaximum(time)
+        if time is not None:
+            self.progressBarExposure.setMaximum(time)
 
     @QtCore.pyqtSlot()
     def start_acquisition(self):

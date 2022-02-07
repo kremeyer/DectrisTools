@@ -31,7 +31,6 @@ class LiveViewWidget(pg.ImageView):
     def __callback_move(self, evt):
         """
         callback function for mouse movement on image
-        -> triggers status bar update
         """
         qpoint = self.view.mapSceneToView(evt[0])
         x = int(qpoint.x())
@@ -57,14 +56,13 @@ class DectrisImageGrabber(QObject):
         try:
             _ = self.Q.state
             self.connected = True
-            log.info('DectrisImageGrabber successfully connected to detector')
-            log.info(self.Q)
+            log.info(f'DectrisImageGrabber successfully connected to detector\n{self.Q}')
         except OSError:
             log.warning('DectrisImageGrabber could not establish connection to detector')
 
         if self.connected:
             if self.Q.state == 'na':
-                log.warning('Detector need to be initialized, that may take a while...')
+                log.warning('Detector needs to be initialized, that may take a while...')
                 self.Q.initialize()
             self.Q.mon.clear()
             self.Q.fw.clear()
@@ -90,10 +88,13 @@ class DectrisImageGrabber(QObject):
 
         log.debug(f'started image_grabber_thread {self.image_grabber_thread.currentThread()}')
 
+        # TODO when using the real detector in trigger and there is no trigger signal, this thing can get stuck
+        # figure out away to look out for that
         if self.connected:
             self.Q.arm()
-            self.Q.trigger()
-            self.exposure_triggered.emit()
+            if self.Q.trigger_mode == 'ints':
+                self.exposure_triggered.emit()
+                self.Q.trigger()
             while not self.Q.state == 'idle':
                 sleep(0.05)
             self.Q.disarm()
@@ -123,7 +124,6 @@ class DectrisStatusGrabber(QObject):
             _ = self.Q.state
             self.connected = True
             log.info('DectrisStatusGrabber successfully connected to detector')
-            log.info(self.Q)
         except OSError:
             log.warning('DectrisStatusGrabber could not establish connection to detector')
 
@@ -156,6 +156,9 @@ class ExposureProgressWorker(QObject):
     @pyqtSlot()
     def __start_progress(self):
         while True:
+            if self.progress_thread.isInterruptionRequested():
+                self.progress_thread.quit()
+                break
             self.advance_progress_bar.emit()
             sleep(0.01)
 
@@ -164,17 +167,12 @@ def interrupt_liveview(f):
     def wrapper(self):
         log.debug('stopping liveview')
         self.image_timer.stop()
-        log.debug('waiting for image grabing thread to finish')
-        # wait 2*exposure time for detector to finish; otherwise abort
         if self.dectris_image_grabber.connected:
-            for _ in range(int(self.dectris_image_grabber.Q.frame_time)*1000):
-                if self.dectris_image_grabber.image_grabber_thread.isFinished():
-                    break
-                sleep(0.002)
+            sleep(0.5)
             if not self.dectris_image_grabber.image_grabber_thread.isFinished():
-                log.warning('image grabbing thread does not seem to finish, aborting acquisition')
-                if self.dectris_image_grabber.connected:
-                    self.dectris_image_grabber.Q.abort()
+                log.info('aborting acquisition')
+                self.dectris_image_grabber.Q.abort()
+                sleep(1)
         f(self)
         log.debug('restarting liveview')
         self.image_timer.start(self.update_interval)
