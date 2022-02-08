@@ -3,14 +3,16 @@ import logging as log
 import numpy as np
 from PyQt5 import QtWidgets, QtCore, QtGui, uic
 import pyqtgraph as pg
-from ..lib.Utils import DectrisImageGrabber, DectrisStatusGrabber, ExposureProgressWorker, interrupt_liveview
 from .. import get_base_path
+from ..lib.Utils import DectrisImageGrabber, DectrisStatusGrabber, ExposureProgressWorker, interrupt_liveview
+from .roi import ROIView
 
 
 class LiveViewUi(QtWidgets.QMainWindow):
     image = None
     i_digits = 5
     update_interval = None
+    rois = []
 
     def __init__(self, cmd_args, *args, **kwargs):
         log.debug('initializing DectrisLiveView')
@@ -52,9 +54,12 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.image_timer.start(self.update_interval)
         self.status_timer.start(200)
 
-        self.viewer.addItem(pg.RectROI((0, 0), (50, 50)))
-
+        self.roi_view = ROIView(title='ROIs')
+        self.roi_view.show()
         self.show()
+
+    def closeEvent(self, evt):
+        self.roi_view.hide()
 
     def init_statusbar(self):
         self.viewer.cursor_changed.connect(self.update_label_intensity)
@@ -157,4 +162,25 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
     @QtCore.pyqtSlot()
     def add_rect_roi(self):
-        self.viewer.addItem(pg.RectROI((100, 100), (100, 100)))
+        if self.image is not None:
+            log.info('added rectangular ROI')
+            roi = pg.RectROI((100, 100), (100, 100), centered=True, sideScalers=True)
+            roi.removable = True
+            roi.sigRemoveRequested.connect(self.remove_roi)
+            roi.sigRegionChanged.connect(self.update_roi)
+
+            self.viewer.addItem(roi)
+            roi.plot_item = self.roi_view.addPlot()
+            self.update_roi(roi)
+            self.roi_view.rearrange()
+        else:
+            log.warning('cannot add ROI before an image is dislayed')
+
+    def update_roi(self, roi):
+        roi_data = roi.getArrayRegion(self.image, self.viewer.imageItem)
+        roi.plot_item.clear()
+        roi.plot_item.plot(roi_data.mean(axis=-1))
+
+    @QtCore.pyqtSlot(tuple)
+    def remove_roi(self, evt):
+        self.viewer.scene.removeItem(evt)
