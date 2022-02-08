@@ -2,6 +2,7 @@ from os import path
 import logging as log
 import numpy as np
 from PyQt5 import QtWidgets, QtCore, QtGui, uic
+import pyqtgraph as pg
 from ..lib.Utils import DectrisImageGrabber, DectrisStatusGrabber, ExposureProgressWorker, interrupt_liveview
 from .. import get_base_path
 
@@ -39,6 +40,9 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.labelTrigger = QtWidgets.QLabel()
         self.labelExposure = QtWidgets.QLabel()
 
+        self.actionAddRectangle.triggered.connect(self.add_rect_roi)
+        self.actionAddRectangle.setShortcut('R')
+
         self.comboBoxTriggerMode.currentIndexChanged.connect(self.update_trigger_mode)
         self.lineEditExposure.returnPressed.connect(self.update_exposure)
 
@@ -47,6 +51,8 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
         self.image_timer.start(self.update_interval)
         self.status_timer.start(200)
+
+        self.viewer.addItem(pg.RectROI((0, 0), (50, 50)))
 
         self.show()
 
@@ -92,7 +98,8 @@ class LiveViewUi(QtWidgets.QMainWindow):
     def update_image(self, image):
         self.image = image
         self.viewer.x_size, self.viewer.y_size = self.image.shape
-        self.viewer.setImage(self.image, autoRange=True, autoLevels=True)
+        self.viewer.setImage(self.image, autoRange=self.checkBoxAutoRange.isChecked(),
+                             autoLevels=self.checkBoxAutoRange.isChecked())
         self.i_digits = len(str(int(self.image.max(initial=1))))
         self.exposure_progress_worker.progress_thread.requestInterruption()
         self.exposure_progress_worker.progress_thread.wait()
@@ -147,3 +154,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot()
     def start_acquisition(self):
         self.dectris_image_grabber.image_grabber_thread.start()
+
+    @QtCore.pyqtSlot()
+    def add_rect_roi(self):
+        self.viewer.addItem(pg.RectROI((100, 100), (100, 100)))

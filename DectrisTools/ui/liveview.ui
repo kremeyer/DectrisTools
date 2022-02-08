@@ -36,6 +36,16 @@
          </widget>
         </item>
         <item>
+         <widget class="QCheckBox" name="checkBoxAutoRange">
+          <property name="text">
+           <string>Auto Range</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
          <widget class="QLabel" name="label">
           <property name="text">
            <string>Trigger Mode</string>
@@ -118,8 +128,20 @@
      <height>22</height>
     </rect>
    </property>
+   <widget class="QMenu" name="menuROI">
+    <property name="title">
+     <string>ROI</string>
+    </property>
+    <addaction name="actionAddRectangle"/>
+   </widget>
+   <addaction name="menuROI"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionAddRectangle">
+   <property name="text">
+    <string>Add Rectangle</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>
