@@ -201,3 +201,13 @@ class LiveViewUi(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot()
     def update_y_axis_link(self):
         self.roi_view.set_link_y_axis(self.actionLinkYAxis.isChecked())
+
+            time = 500
+        self.exposure_progress_worker.progress_thread.wait()
+        self.progressBarExposure.setValue(self.progressBarExposure.minimum())
+        if time is not None:
+            self.progressBarExposure.setMaximum(time)
+
+    @QtCore.pyqtSlot()
+    def start_acquisition(self):
+        self.dectris_image_grabber.image_grabber_thread.start()

@@ -1,6 +1,7 @@
 from time import sleep
 import logging as log
 import io
+import pyqtgraph as pg
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, QObject, QThread
 import numpy as np
 from PIL import Image
@@ -29,7 +30,6 @@ class DectrisImageGrabber(QObject):
                 self.Q.initialize()
             self.Q.mon.clear()
             self.Q.fw.clear()
-
             self.Q.fw.mode = 'disabled'
             self.Q.mon.mode = 'enabled'
             self.Q.incident_energy = 1e5
@@ -51,17 +51,21 @@ class DectrisImageGrabber(QObject):
 
         log.debug(f'started image_grabber_thread {self.image_grabber_thread.currentThread()}')
 
-        # TODO when using the real detector in trigger and there is no trigger signal, this thing can get stuck
-        # figure out away to look out for that; probably use .isInterruptionRequested in while loops
         if self.connected:
             self.Q.arm()
             if self.Q.trigger_mode == 'ints':
                 self.exposure_triggered.emit()
                 self.Q.trigger()
             while not self.Q.state == 'idle':
+                if self.image_grabber_thread.isInterruptionRequested():
+                    self.image_grabber_thread.quit()
+                    return
                 sleep(0.05)
             self.Q.disarm()
             while not self.Q.mon.image_list:
+                if self.image_grabber_thread.isInterruptionRequested():
+                    self.image_grabber_thread.quit()
+                    return
                 sleep(0.05)
             # image comes as a file-like object in tif format
             self.image_ready.emit(np.array(Image.open(io.BytesIO(self.Q.mon.last_image))))
@@ -73,7 +77,6 @@ class DectrisImageGrabber(QObject):
             xs, ys = np.meshgrid(x, x)
             img = 5e4 * ((np.cos(np.hypot(xs, ys)) / (np.hypot(xs, ys)+1) * np.random.normal(1, 0.1, (512, 512))) + 0.3)
             self.image_ready.emit(img)
-            # self.image_ready.emit(np.random.normal(512, 512))
 
         self.image_grabber_thread.quit()
         log.debug(f'quit image_grabber_thread {self.image_grabber_thread.currentThread()}')
@@ -125,7 +128,7 @@ class ExposureProgressWorker(QObject):
         while True:
             if self.progress_thread.isInterruptionRequested():
                 self.progress_thread.quit()
-                break
+                return
             self.advance_progress_bar.emit()
             sleep(0.01)
 
@@ -135,11 +138,11 @@ def interrupt_liveview(f):
         log.debug('stopping liveview')
         self.image_timer.stop()
         if self.dectris_image_grabber.connected:
-            sleep(0.5)
             if not self.dectris_image_grabber.image_grabber_thread.isFinished():
-                log.info('aborting acquisition')
+                log.debug('aborting acquisition')
                 self.dectris_image_grabber.Q.abort()
-                sleep(1)
+                self.dectris_image_grabber.image_grabber_thread.requestInterruption()
+                self.dectris_image_grabber.image_grabber_thread.wait()
         f(self)
         log.debug('restarting liveview')
         self.image_timer.start(self.update_interval)
