@@ -1,47 +1,10 @@
 from time import sleep
 import logging as log
 import io
-import pyqtgraph as pg
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, QObject, QThread
 import numpy as np
 from PIL import Image
 from ..Quadro import Quadro
-
-
-class LiveViewWidget(pg.ImageView):
-    x_size = 0
-    y_size = 0
-    cursor_changed = pyqtSignal(tuple)
-
-    def __init__(self, parent=None):
-        log.debug('initializing LiveView')
-        super().__init__()
-        pg.setConfigOption('background', (240, 240, 240))
-        pg.setConfigOption('foreground', 'k')
-        self.setParent(parent)
-        self.setPredefinedGradient('inferno')
-        self.setLevels(0, 2**16)
-        self.ui.roiBtn.hide()
-        self.ui.menuBtn.hide()
-
-        self.proxy = pg.SignalProxy(self.scene.sigMouseMoved,
-                                    rateLimit=60, slot=self.__callback_move)
-
-    @pyqtSlot(tuple)
-    def __callback_move(self, evt):
-        """
-        callback function for mouse movement on image
-        """
-        qpoint = self.view.mapSceneToView(evt[0])
-        x = int(qpoint.x())
-        y = int(qpoint.y())
-        if x < 0 or x >= self.x_size:
-            self.cursor_changed.emit((np.NaN, np.NaN))
-            return
-        if y < 0 or y >= self.y_size:
-            self.cursor_changed.emit((np.NaN, np.NaN))
-            return
-        self.cursor_changed.emit((x, y))
 
 
 class DectrisImageGrabber(QObject):
@@ -89,7 +52,7 @@ class DectrisImageGrabber(QObject):
         log.debug(f'started image_grabber_thread {self.image_grabber_thread.currentThread()}')
 
         # TODO when using the real detector in trigger and there is no trigger signal, this thing can get stuck
-        # figure out away to look out for that
+        # figure out away to look out for that; probably use .isInterruptionRequested in while loops
         if self.connected:
             self.Q.arm()
             if self.Q.trigger_mode == 'ints':
@@ -105,8 +68,12 @@ class DectrisImageGrabber(QObject):
             self.Q.mon.clear()
         else:
             self.exposure_triggered.emit()
-            sleep(5)
-            self.image_ready.emit(np.random.rand(512, 512) * 2**16)
+            sleep(1)
+            x = np.linspace(-10, 10, 512)
+            xs, ys = np.meshgrid(x, x)
+            img = 5e4 * ((np.cos(np.hypot(xs, ys)) / (np.hypot(xs, ys)+1) * np.random.normal(1, 0.1, (512, 512))) + 0.3)
+            self.image_ready.emit(img)
+            # self.image_ready.emit(np.random.normal(512, 512))
 
         self.image_grabber_thread.quit()
         log.debug(f'quit image_grabber_thread {self.image_grabber_thread.currentThread()}')

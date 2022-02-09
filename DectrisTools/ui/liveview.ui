@@ -133,6 +133,7 @@
      <string>ROI</string>
     </property>
     <addaction name="actionAddRectangle"/>
+    <addaction name="actionLinkYAxis"/>
    </widget>
    <addaction name="menuROI"/>
   </widget>
@@ -142,12 +143,28 @@
     <string>Add Rectangle</string>
    </property>
   </action>
+  <action name="actionRemoveRectangle">
+   <property name="text">
+    <string>Remove Rectangle</string>
+   </property>
+  </action>
+  <action name="actionLinkYAxis">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Link Y Axis</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>
    <class>LiveViewWidget</class>
    <extends>QWidget</extends>
-   <header location="global">DectrisTools.lib.Utils</header>
+   <header location="global">DectrisTools.ui.widgets</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

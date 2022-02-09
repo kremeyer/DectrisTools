@@ -5,14 +5,13 @@ from PyQt5 import QtWidgets, QtCore, QtGui, uic
 import pyqtgraph as pg
 from .. import get_base_path
 from ..lib.Utils import DectrisImageGrabber, DectrisStatusGrabber, ExposureProgressWorker, interrupt_liveview
-from .roi import ROIView
+from .widgets import ROIView
 
 
 class LiveViewUi(QtWidgets.QMainWindow):
     image = None
     i_digits = 5
     update_interval = None
-    rois = []
 
     def __init__(self, cmd_args, *args, **kwargs):
         log.debug('initializing DectrisLiveView')
@@ -44,6 +43,8 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
         self.actionAddRectangle.triggered.connect(self.add_rect_roi)
         self.actionAddRectangle.setShortcut('R')
+        self.actionLinkYAxis.triggered.connect(self.update_y_axis_link)
+        self.actionLinkYAxis.setShortcut('Y')
 
         self.comboBoxTriggerMode.currentIndexChanged.connect(self.update_trigger_mode)
         self.lineEditExposure.returnPressed.connect(self.update_exposure)
@@ -55,7 +56,6 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.status_timer.start(200)
 
         self.roi_view = ROIView(title='ROIs')
-        self.roi_view.show()
         self.show()
 
     def closeEvent(self, evt):
@@ -151,7 +151,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         if self.dectris_image_grabber.connected:
             time = self.progressBarExposure.setMaximum(int(self.dectris_image_grabber.Q.frame_time*100))
         else:
-            time = 500
+            time = 100
         self.progressBarExposure.setValue(0)
         if time is not None:
             self.progressBarExposure.setMaximum(time)
@@ -164,23 +164,40 @@ class LiveViewUi(QtWidgets.QMainWindow):
     def add_rect_roi(self):
         if self.image is not None:
             log.info('added rectangular ROI')
-            roi = pg.RectROI((100, 100), (100, 100), centered=True, sideScalers=True)
+            roi = pg.RectROI((self.image.shape[0]/2-50, self.image.shape[1]/2-50), (100, 100),
+                             centered=True, sideScalers=True,
+                             pen=pg.mkPen('c', width=2), hoverPen=pg.mkPen('c', width=3),
+                             handlePen=pg.mkPen('w', width=3), handleHoverPen=pg.mkPen('w', width=4))
             roi.removable = True
             roi.sigRemoveRequested.connect(self.remove_roi)
             roi.sigRegionChanged.connect(self.update_roi)
 
             self.viewer.addItem(roi)
             roi.plot_item = self.roi_view.addPlot()
-            self.update_roi(roi)
+            roi.plot_item.setMouseEnabled(x=False, y=True)
+            if len(self.roi_view) > 1 and self.actionLinkYAxis.isChecked():
+                roi.plot_item.setYLink(self.roi_view.plots[0])
+
             self.roi_view.rearrange()
+            self.update_roi(roi)
+            self.roi_view.show()
+
         else:
             log.warning('cannot add ROI before an image is dislayed')
 
+    @QtCore.pyqtSlot(tuple)
     def update_roi(self, roi):
         roi_data = roi.getArrayRegion(self.image, self.viewer.imageItem)
         roi.plot_item.clear()
-        roi.plot_item.plot(roi_data.mean(axis=-1))
+        roi.plot_item.plot(roi_data.mean(axis=np.argmin(roi_data.shape)))
 
     @QtCore.pyqtSlot(tuple)
-    def remove_roi(self, evt):
-        self.viewer.scene.removeItem(evt)
+    def remove_roi(self, roi):
+        self.viewer.scene.removeItem(roi)
+        self.roi_view.removeItem(roi.plot_item)
+        if len(self.roi_view) == 0:
+            self.roi_view.hide()
+
+    @QtCore.pyqtSlot()
+    def update_y_axis_link(self):
+        self.roi_view.set_link_y_axis(self.actionLinkYAxis.isChecked())
