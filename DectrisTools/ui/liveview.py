@@ -115,7 +115,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot()
     def update_trigger_mode(self):
         mode = self.comboBoxTriggerMode.currentText()
-        if mode == 'exts':
+        if mode == 'exte':
             self.lineEditExposure.setEnabled(False)
         else:
             self.lineEditExposure.setEnabled(True)

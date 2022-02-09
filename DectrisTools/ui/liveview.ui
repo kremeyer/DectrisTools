@@ -64,12 +64,12 @@
           </item>
           <item>
            <property name="text">
-            <string extracomment="Externally Enabled Exposure Series">exte</string>
+            <string extracomment="Externally Triggered Exposure Series">exts</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string extracomment="Externally Triggered Exposure Series">exts</string>
+            <string extracomment="Externally Enabled Exposure Series">exte</string>
            </property>
           </item>
          </widget>

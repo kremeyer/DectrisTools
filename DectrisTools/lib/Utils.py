@@ -55,13 +55,14 @@ class DectrisImageGrabber(QObject):
             self.Q.arm()
             if self.Q.trigger_mode == 'ints':
                 self.exposure_triggered.emit()
+                self.wait_for_state('idle')
                 self.Q.trigger()
-            while not self.Q.state == 'idle':
-                if self.image_grabber_thread.isInterruptionRequested():
-                    self.image_grabber_thread.quit()
-                    return
-                sleep(0.05)
-            self.Q.disarm()
+                self.wait_for_state('idle', False)
+                self.Q.disarm()
+            if self.Q.trigger_mode == 'exts':
+                self.wait_for_state('ready')
+                self.exposure_triggered.emit()
+                self.wait_for_state('acquire')
             while not self.Q.mon.image_list:
                 if self.image_grabber_thread.isInterruptionRequested():
                     self.image_grabber_thread.quit()
@@ -80,6 +81,23 @@ class DectrisImageGrabber(QObject):
 
         self.image_grabber_thread.quit()
         log.debug(f'quit image_grabber_thread {self.image_grabber_thread.currentThread()}')
+
+    def wait_for_state(self, state_name, logic=True):
+        log.debug(f'waiting for state: {state_name} to be {logic}')
+        if logic:
+            while self.Q.state == state_name:
+                if self.image_grabber_thread.isInterruptionRequested():
+                    self.image_grabber_thread.quit()
+                    return
+                sleep(0.05)
+            return
+        while self.Q.state != state_name:
+            if self.image_grabber_thread.isInterruptionRequested():
+                self.image_grabber_thread.quit()
+                return
+            sleep(0.05)
+
+
 
 
 class DectrisStatusGrabber(QObject):
