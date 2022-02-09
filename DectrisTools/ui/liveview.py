@@ -106,6 +106,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.viewer.setImage(self.image, autoRange=self.checkBoxAutoRange.isChecked(),
                              autoLevels=self.checkBoxAutoRange.isChecked())
         self.i_digits = len(str(int(self.image.max(initial=1))))
+        self.update_all_rois()
         self.exposure_progress_worker.progress_thread.requestInterruption()
         self.exposure_progress_worker.progress_thread.wait()
         self.reset_progress_bar()
@@ -191,6 +192,11 @@ class LiveViewUi(QtWidgets.QMainWindow):
         roi.plot_item.clear()
         roi.plot_item.plot(roi_data.mean(axis=np.argmin(roi_data.shape)))
 
+    def update_all_rois(self):
+        for i in self.viewer.view.addedItems:
+            if isinstance(i, pg.RectROI):
+                self.update_roi(i)
+
     @QtCore.pyqtSlot(tuple)
     def remove_roi(self, roi):
         self.viewer.scene.removeItem(roi)
@@ -201,12 +207,6 @@ class LiveViewUi(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot()
     def update_y_axis_link(self):
         self.roi_view.set_link_y_axis(self.actionLinkYAxis.isChecked())
-
-            time = 500
-        self.exposure_progress_worker.progress_thread.wait()
-        self.progressBarExposure.setValue(self.progressBarExposure.minimum())
-        if time is not None:
-            self.progressBarExposure.setMaximum(time)
 
     @QtCore.pyqtSlot()
     def start_acquisition(self):
