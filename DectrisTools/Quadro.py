@@ -1,6 +1,14 @@
+"""
+Quadro module
+
+this module collects classes used to connect to the DCU of the Dectris detector and make use of the detector itself
+"""
+
 import numpy as np
 from .lib.DEigerClient import DEigerClient
 
+# CONSTANTS
+# these lists are read by the following classes to generate some of their methods
 CONFIGS_READ = ['description',
                 'detector_number',
                 'eiger_fw_version',
@@ -32,29 +40,49 @@ MON_COMMANDS = ['clear']
 
 
 class QuadroError(Exception):
+    """
+    basic exception
+    """
     pass
 
 
 class FileWriter:
-
+    """
+    class for interaction with the filewriter subsystem of the Dectris DCU
+    """
     def __init__(self, parent):
         self.parent = parent
 
+        # read available command from constants defined above and create corresponding methods
         for command in FW_COMMANDS:
             setattr(self, command, self.__make_command_method(command))
 
     def __getattribute__(self, key):
+        """
+        if the requested attribute represents a state of the filewriter subsystem of the DCU, the api is called to
+        return the state
+        for all other attributes the default behaviour of object is mirrored
+        """
         if key in FW_STATS:
             return self.parent.fileWriterStatus(key)['value']
         return object.__getattribute__(self, key)
 
     def __make_command_method(self, command):
+        """
+        method factory for commands that may be sent to the filewriter subsystem of the DCU
+        """
         def command_method():
             self.parent.sendFileWriterCommand(command)
 
         command_method.__name__ = command
         return command_method
 
+    def save(self, *args, **kwargs):
+        self.parent.fileWriterSave(*args, **kwargs)
+
+    """
+    all methods below mirror the names of the variables found in the SIMPLON API manual
+    """
     @property
     def image_nr_start(self):
         return self.parent.fileWriterConfig('image_nr_start')['value']
@@ -97,30 +125,74 @@ class FileWriter:
             raise QuadroError('setting nimages_per_file cannot be negative')
         self.parent.setFileWriterConfig('nimages_per_file', n)
 
-    def save(self, *args, **kwargs):
-        self.parent.fileWriterSave(*args, **kwargs)
-
 
 class Monitor:
-
+    """
+    class for interaction with the monitor subsystem of the Dectris DCU
+    """
     def __init__(self, parent):
         self.parent = parent
 
+        # read available command from constants defined above and create corresponding methods
         for command in MON_COMMANDS:
             setattr(self, command, self.__make_command_method(command))
 
     def __getattribute__(self, key):
+        """
+        if the requested attribute represents a state of the monitor subsystem of the DCU, the api is called to
+        return the state
+        for all other attributes the default behaviour of object is mirrored
+        """
         if key in MON_STATS:
             return self.parent.monitorStatus(key)['value']
         return object.__getattribute__(self, key)
 
     def __make_command_method(self, command):
+        """
+        method factory for commands that may be sent to the filewriter subsystem of the DCU
+        """
         def command_method():
             self.parent.sendMonitorCommand(command)
 
         command_method.__name__ = command
         return command_method
 
+    @property
+    def last_image(self):
+        """
+        return the newest image in monitor
+        """
+        return self.parent.monitorImages('monitor')
+
+    @property
+    def first_image(self):
+        """
+        return the oldest image in monitor
+        """
+        return self.parent.monitorImages('next')
+
+    @property
+    def image_list(self):
+        """
+        return list of images in monitor
+        """
+        return self.parent.monitorImages(None)
+
+    def save_last_image(self, path):
+        """
+        save the newest image in monitor to disk
+        """
+        self.parent.monitorSave('monitor', path)
+
+    def save_first_image(self, path):
+        """
+        save the oldest image in monitor to disk
+        """
+        self.parent.monitorSave('next', path)
+
+    """
+    all methods below mirror the names of the variables found in the SIMPLON API manual
+    """
     @property
     def buffer_size(self):
         return self.parent.monitorConfig('buffer_size')['value']
@@ -154,37 +226,35 @@ class Monitor:
             raise QuadroError(f'setting mode requires "enabled" or "disabled"')
         self.parent.setMonitorConfig('mode', mode)
 
-    @property
-    def last_image(self):
-        return self.parent.monitorImages('monitor')
-
-    @property
-    def first_image(self):
-        return self.parent.monitorImages('next')
-
-    @property
-    def image_list(self):
-        return self.parent.monitorImages(None)
-
-    def save_last_image(self, path):
-        self.parent.monitorSave('monitor', path)
-
-    def save_first_image(self, path):
-        self.parent.monitorSave('next', path)
-
 
 class Quadro(DEigerClient):
+    """
+    main class for interacting with the Dectris DCU and the connected Detector
 
+    all interactions with the detector itself are bound to self
+    all interactions with the monitor subsystem are bound to self.mon
+    all interactions with the filewriter subsystem are ound to self.fw
+    the stream subsystem is yet to be added
+    """
     def __init__(self, *args, **kwargs):
+        """
+        all arguments of the __init__ method are passed to the SIMPLON API DEigerClient class
+        """
         super(Quadro, self).__init__(*args, **kwargs)
 
+        # read available command from constants defined above and create corresponding methods
         for command in COMMANDS:
             setattr(self, command, self.__make_command_method(command))
 
+        # creating instances of subsystems
         self.fw = FileWriter(parent=self)
         self.mon = Monitor(parent=self)
 
     def __getattribute__(self, key):
+        """
+        if the requested attribute represents a state of the detector, the api is called to return it
+        for all other attributes the default behaviour of object is mirrored
+        """
         if key in CONFIGS_READ or key in CONFIGS_WRTIE_NUM:
             return self.detectorConfig(key)['value']
         if key in STATS:
@@ -192,6 +262,11 @@ class Quadro(DEigerClient):
         return object.__getattribute__(self, key)
 
     def __setattr__(self, key, value):
+        """
+        if the attribute to set represents a writeable numeric configuration of the detector, the api is called
+        to write it
+        for all other attributes the default behaviour of object is mirrored (or overwritten in the following)
+        """
         if key in CONFIGS_WRTIE_NUM:
             if not isinstance(value, (int, float)):
                 raise QuadroError(f'setting {key} requires value of type int or float; not {type(value)}')
@@ -211,6 +286,9 @@ class Quadro(DEigerClient):
             object.__setattr__(self, key, value)
 
     def __str__(self):
+        """
+        get basic detector info from print function
+        """
         return f'Detector:                 {self.description}\n' \
                f'Serial:                   {self.detector_number}\n' \
                f'Eiger FW Version:         {self.eiger_fw_version}\n' \
@@ -219,12 +297,18 @@ class Quadro(DEigerClient):
                f'Pixel size:               {self.x_pixel_size * 1e6}x{self.y_pixel_size * 1e6} µm^2'
 
     def __make_command_method(self, command):
+        """
+        method factory for commands that may be sent to the detector
+        """
         def command_method():
             self.sendDetectorCommand(command)
 
         command_method.__name__ = command
         return command_method
 
+    """
+    all methods below mirror the names of the variables found in the SIMPLON API manual
+    """
     @property
     def auto_summation(self):
         return self.detectorConfig('auto_summation')['value']

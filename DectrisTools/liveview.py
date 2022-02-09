@@ -1,3 +1,8 @@
+"""
+liveview module
+this module starts the liveview ui
+"""
+
 import logging as log
 from PyQt5 import QtWidgets
 from argparse import ArgumentParser

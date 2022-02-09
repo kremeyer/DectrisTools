@@ -4,11 +4,14 @@ import numpy as np
 from PyQt5 import QtWidgets, QtCore, QtGui, uic
 import pyqtgraph as pg
 from .. import get_base_path
-from ..lib.Utils import DectrisImageGrabber, DectrisStatusGrabber, ExposureProgressWorker, interrupt_liveview
+from ..lib.Utils import DectrisImageGrabber, DectrisStatusGrabber, ConstantPing, interrupt_acquisition
 from .widgets import ROIView
 
 
 class LiveViewUi(QtWidgets.QMainWindow):
+    """
+    main window of the LiveView application
+    """
     image = None
     i_digits = 5
     update_interval = None
@@ -23,7 +26,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
                                                          trigger_mode=self.comboBoxTriggerMode.currentText(),
                                                          exposure=float(self.lineEditExposure.text())/1000)
         self.dectris_status_grabber = DectrisStatusGrabber(cmd_args.ip, cmd_args.port)
-        self.exposure_progress_worker = ExposureProgressWorker()
+        self.exposure_progress_worker = ConstantPing()
         self.dectris_image_grabber.exposure_triggered.connect(self.exposure_progress_worker.progress_thread.start)
 
         self.image_timer = QtCore.QTimer()
@@ -111,7 +114,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.exposure_progress_worker.progress_thread.wait()
         self.reset_progress_bar()
 
-    @interrupt_liveview
+    @interrupt_acquisition
     @QtCore.pyqtSlot()
     def update_trigger_mode(self):
         mode = self.comboBoxTriggerMode.currentText()
@@ -125,7 +128,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         else:
             log.warning(f'could not change trigger mode, detector disconnected')
 
-    @interrupt_liveview
+    @interrupt_acquisition
     @QtCore.pyqtSlot()
     def update_exposure(self):
         try:

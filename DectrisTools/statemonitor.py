@@ -1,5 +1,7 @@
+"""
+module to continiously print the current state of the detector and it's subsystem to the terminal
+"""
 import os
-import logging as log
 from argparse import ArgumentParser
 from time import sleep
 from .Quadro import Quadro
@@ -23,13 +25,13 @@ def clear_output():
 
 def run():
     args = parse_args()
-    Q = Quadro(args.ip, args.port)
+    q = Quadro(args.ip, args.port)
 
     while True:
-        print(Q)
-        print(f'detector state:           {Q.state}')
-        print(f'monitor state:            {Q.mon.state}')
-        print(f'filewriter state:         {Q.fw.state}')
+        print(q)
+        print(f'detector state:           {q.state}')
+        print(f'monitor state:            {q.mon.state}')
+        print(f'filewriter state:         {q.fw.state}')
         sleep(args.update_interval/1000)
         clear_output()
 

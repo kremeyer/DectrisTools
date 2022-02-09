@@ -1,7 +1,9 @@
+"""
+collection of helper classes and functions
+"""
 from time import sleep
 import logging as log
 import io
-import pyqtgraph as pg
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, QObject, QThread
 import numpy as np
 from PIL import Image
@@ -9,6 +11,9 @@ from ..Quadro import Quadro
 
 
 class DectrisImageGrabber(QObject):
+    """
+    class capable of setting the collecting images from the detector in a non-blocking fashion
+    """
     image_ready = pyqtSignal(np.ndarray)
     exposure_triggered = pyqtSignal()
     connected = False
@@ -24,6 +29,7 @@ class DectrisImageGrabber(QObject):
         except OSError:
             log.warning('DectrisImageGrabber could not establish connection to detector')
 
+        # prepare the hardware for taking images
         if self.connected:
             if self.Q.state == 'na':
                 log.warning('Detector needs to be initialized, that may take a while...')
@@ -44,15 +50,17 @@ class DectrisImageGrabber(QObject):
     def __del__(self):
         if self.connected:
             self.Q.mon.clear()
-            self.Q.disarm()
+            self.Q.abort()
 
     @pyqtSlot()
     def __get_image(self):
-
+        """
+        image collection method
+        """
         log.debug(f'started image_grabber_thread {self.image_grabber_thread.currentThread()}')
-
         if self.connected:
             self.Q.arm()
+            # logic for different trigger modes
             if self.Q.trigger_mode == 'ints':
                 self.exposure_triggered.emit()
                 self.wait_for_state('idle')
@@ -63,15 +71,17 @@ class DectrisImageGrabber(QObject):
                 self.wait_for_state('ready')
                 self.exposure_triggered.emit()
                 self.wait_for_state('acquire')
+            # wait until images appears in monitor
             while not self.Q.mon.image_list:
                 if self.image_grabber_thread.isInterruptionRequested():
                     self.image_grabber_thread.quit()
                     return
                 sleep(0.05)
-            # image comes as a file-like object in tif format
+            # image comes as a file-like object in tif format and is emitted as np.ndarray
             self.image_ready.emit(np.array(Image.open(io.BytesIO(self.Q.mon.last_image))))
             self.Q.mon.clear()
         else:
+            # simulated image for @home use
             self.exposure_triggered.emit()
             sleep(1)
             x = np.linspace(-10, 10, 512)
@@ -83,6 +93,9 @@ class DectrisImageGrabber(QObject):
         log.debug(f'quit image_grabber_thread {self.image_grabber_thread.currentThread()}')
 
     def wait_for_state(self, state_name, logic=True):
+        """
+        making sure waiting for the detector to enter or leave a state is not blocking the interruption of the thread
+        """
         log.debug(f'waiting for state: {state_name} to be {logic}')
         if logic:
             while self.Q.state == state_name:
@@ -98,9 +111,10 @@ class DectrisImageGrabber(QObject):
             sleep(0.05)
 
 
-
-
 class DectrisStatusGrabber(QObject):
+    """
+    class for continiously retrieving status information from the DCU
+    """
     status_ready = pyqtSignal(dict)
     connected = False
 
@@ -131,11 +145,16 @@ class DectrisStatusGrabber(QObject):
         log.debug(f'quit status_grabber_thread {self.status_grabber_thread.currentThread()}')
 
 
-class ExposureProgressWorker(QObject):
+class ConstantPing(QObject):
+    """
+    emitting signals at a constant frequency until interrupted
+    """
     advance_progress_bar = pyqtSignal()
 
-    def __init__(self):
+    def __init__(self, period=0.01):
         super().__init__()
+
+        self.period = period
 
         self.progress_thread = QThread()
         self.moveToThread(self.progress_thread)
@@ -148,10 +167,13 @@ class ExposureProgressWorker(QObject):
                 self.progress_thread.quit()
                 return
             self.advance_progress_bar.emit()
-            sleep(0.01)
+            sleep(self.period)
 
 
-def interrupt_liveview(f):
+def interrupt_acquisition(f):
+    """
+    decorator interrupting/resuming image acquisition before/after function call
+    """
     def wrapper(self):
         log.debug('stopping liveview')
         self.image_timer.stop()
