@@ -1,7 +1,7 @@
 import logging as log
 from PyQt5 import QtWidgets
 from argparse import ArgumentParser
-from DectrisTools.ui.liveview import LiveViewUi
+from .ui.liveview import LiveViewUi
 
 
 def parse_args():
@@ -16,7 +16,7 @@ def parse_args():
     if args.verbose:
         log.basicConfig(format='[%(asctime)s] %(levelname)-8s | %(message)s', level='DEBUG', datefmt='%H:%M:%S')
     else:
-        log.basicConfig(format='[%(asctime)s] %(levelname)-8s | %(message)s', level='WARNING', datefmt='%H:%M:%S')
+        log.basicConfig(format='[%(asctime)s] %(levelname)-8s | %(message)s', level='INFO', datefmt='%H:%M:%S')
 
     return args
 

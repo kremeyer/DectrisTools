@@ -1,5 +1,5 @@
 import numpy as np
-from DectrisTools.lib.DEigerClient import DEigerClient
+from .lib.DEigerClient import DEigerClient
 
 CONFIGS_READ = ['description',
                 'detector_number',
@@ -259,58 +259,3 @@ class Quadro(DEigerClient):
         if mode not in allowed:
             raise QuadroError(f'trigger mode {mode} not allowed; use one of {allowed}')
         self.setDetectorConfig('trigger_mode', mode)
-
-# if __name__ == '__main__':
-#     DCU_HOSTNAME    = 'fe80::4ed9:8fff:feca:a8f9'
-#     DCU_PORT        = 80
-#
-#     import itertools
-#     import sys
-#     from time import sleep
-#     import os
-#
-#     spinner = itertools.cycle(['|', '/', '-', '\\'])
-#
-#     DATA_DIR = r'C:\Users\Siwicklab_Server\Desktop\trigger_test'
-#     Q = Quadro(DCU_HOSTNAME, port=DCU_PORT)
-#
-#
-#     if not Q.state == 'idle':
-#         raise QuadroError('detector not idle')
-#
-#     Q.fw.mode = 'enabled'
-#     Q.incident_energy = 1e5
-#     Q.count_time = 0.005
-#     Q.frame_time = 0.01
-#     Q.nimages = 1
-#     Q.trigger_mode = 'exte'
-#     Q.ntrigger = 10000
-#     Q.fw.name_pattern = '20220127_ext_trigger_test_$id'
-#     Q.fw.clear()
-#
-#     Q.arm()
-#     while not Q.state == 'idle':
-#         msg = f'Waiting for detector idle state...{next(spinner)}'
-#         sys.stdout.write(msg)
-#         sys.stdout.flush()
-#         sleep(0.2)
-#         for _ in msg:
-#             sys.stdout.write('\b')
-#     print('Detector acquisition complete')
-#     Q.disarm()
-#
-#     while Q.fw.state == 'acquire':
-#         msg = f'Filewriter is acquiring...{next(spinner)}'
-#         sys.stdout.write(msg)
-#         sys.stdout.flush()
-#         sleep(0.2)
-#         for _ in msg:
-#             sys.stdout.write('\b')
-#     if Q.fw.state == 'ready':
-#         print('Filewriter acqusition complete')
-#
-#     files_ready = Q.fw.files
-#     for f in files_ready:
-#         Q.fw.save(f, DATA_DIR)
-#         print(f'saved {os.path.join(DATA_DIR, f)}')
-#

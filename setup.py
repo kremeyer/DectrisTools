@@ -6,7 +6,7 @@ setup(
     version=VERSION,
     packages=find_packages(),
     include_package_data=True,
-    install_requires=['numpy', 'pyqtgraph', 'PyQt5'],
+    install_requires=['numpy', 'pyqtgraph', 'PyQt5', 'pillow'],
     url='https://github.com/kremeyer/DectrisTools',
     license='',
     author='Laurenz Kremeyer',
