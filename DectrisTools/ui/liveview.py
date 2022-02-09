@@ -140,7 +140,8 @@ class LiveViewUi(QtWidgets.QMainWindow):
             time = self.progressBarExposure.setMaximum(int(self.dectris_image_grabber.Q.frame_time*100))
         else:
             time = 500
-        self.progressBarExposure.setValue(0)
+        self.exposure_progress_worker.progress_thread.wait()
+        self.progressBarExposure.setValue(self.progressBarExposure.minimum())
         if time is not None:
             self.progressBarExposure.setMaximum(time)
 
