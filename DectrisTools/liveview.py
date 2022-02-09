@@ -23,6 +23,10 @@ def parse_args():
 
 def run():
     import sys
+    import pyqtgraph as pg
+
+    pg.setConfigOption('background', 'k')
+    pg.setConfigOption('foreground', 'w')
 
     args = parse_args()
     app = QtWidgets.QApplication(sys.argv)
