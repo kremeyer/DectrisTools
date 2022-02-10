@@ -18,7 +18,7 @@ class LiveViewWidget(pg.ImageView):
         self.setLevels(0, 2**16)
         self.ui.roiBtn.hide()
         self.ui.menuBtn.hide()
-
+        self.view.invertY(False)
         self.proxy = pg.SignalProxy(self.scene.sigMouseMoved,
                                     rateLimit=60, slot=self.__callback_move)
 

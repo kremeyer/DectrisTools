@@ -48,6 +48,8 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.actionAddRectangle.setShortcut('R')
         self.actionLinkYAxis.triggered.connect(self.update_y_axis_link)
         self.actionLinkYAxis.setShortcut('Y')
+        self.actionAutoRange.setShortcut('A')
+        self.actionShowProjections.setShortcut('P')
 
         self.comboBoxTriggerMode.currentIndexChanged.connect(self.update_trigger_mode)
         self.lineEditExposure.returnPressed.connect(self.update_exposure)
@@ -63,6 +65,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
     def closeEvent(self, evt):
         self.roi_view.hide()
+        self.hide()
         self.image_timer.stop()
         self.status_timer.stop()
         self.dectris_image_grabber.image_grabber_thread.requestInterruption()
@@ -113,10 +116,21 @@ class LiveViewUi(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot(np.ndarray)
     def update_image(self, image):
         self.image = image
-        self.viewer.x_size, self.viewer.y_size = self.image.shape
-        self.viewer.setImage(self.image, autoRange=self.checkBoxAutoRange.isChecked(),
-                             autoLevels=self.checkBoxAutoRange.isChecked())
-        self.i_digits = len(str(int(self.image.max(initial=1))))
+        self.viewer.x_size, self.viewer.y_size = image.shape
+        self.viewer.clear()
+        self.viewer.setImage(image, autoRange=self.actionAutoRange.isChecked(),
+                             autoLevels=self.actionAutoRange.isChecked())
+        if self.actionShowProjections.isChecked():
+            x_projection = np.mean(image, axis=0)
+            x_projection /= np.mean(x_projection)
+            x_projection *= image.shape[1]*0.1
+            self.viewer.addItem(pg.PlotCurveItem(x=x_projection, y=np.arange(0, image.shape[1])+0.5))
+
+            y_projection = np.mean(image, axis=1)
+            y_projection /= np.max(y_projection)
+            y_projection *= image.shape[0]*0.1  # make plot span 10% of the image
+            self.viewer.addItem(pg.PlotCurveItem(x=np.arange(0, image.shape[0])+0.5, y=y_projection, clear=True))
+        self.i_digits = len(str(int(image.max(initial=1))))
         self.update_all_rois()
         self.exposure_progress_worker.progress_thread.requestInterruption()
         self.exposure_progress_worker.progress_thread.wait()
@@ -154,8 +168,8 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
     @QtCore.pyqtSlot()
     def advance_progress_bar(self):
-        if self.progressBarExposure.value()+1 < self.progressBarExposure.maximum():
-            self.progressBarExposure.setValue(self.progressBarExposure.value()+1)
+        if self.progressBarExposure.value() + 1 < self.progressBarExposure.maximum():
+            self.progressBarExposure.setValue(self.progressBarExposure.value() + 1)
         else:
             self.progressBarExposure.setValue(self.progressBarExposure.maximum())
 
