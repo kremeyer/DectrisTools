@@ -24,7 +24,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
         self.dectris_image_grabber = DectrisImageGrabber(cmd_args.ip, cmd_args.port,
                                                          trigger_mode=self.comboBoxTriggerMode.currentText(),
-                                                         exposure=float(self.lineEditExposure.text())/1000)
+                                                         exposure=float(self.lineEditExposure.text()) / 1000)
         self.dectris_status_grabber = DectrisStatusGrabber(cmd_args.ip, cmd_args.port)
         self.exposure_progress_worker = ConstantPing()
         self.dectris_image_grabber.exposure_triggered.connect(self.exposure_progress_worker.progress_thread.start)
@@ -63,6 +63,14 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
     def closeEvent(self, evt):
         self.roi_view.hide()
+        self.image_timer.stop()
+        self.status_timer.stop()
+        self.dectris_image_grabber.image_grabber_thread.requestInterruption()
+        self.exposure_progress_worker.progress_thread.requestInterruption()
+        self.exposure_progress_worker.progress_thread.wait()
+        self.dectris_status_grabber.status_grabber_thread.wait()
+        self.dectris_image_grabber.image_grabber_thread.wait()
+        super().closeEvent(evt)
 
     def init_statusbar(self):
         self.viewer.cursor_changed.connect(self.update_label_intensity)
@@ -100,7 +108,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
             self.labelTrigger.setText(f'Trigger: {states["trigger_mode"]:>4s}')
             if states['trigger_mode'] == 'exts':
                 self.labelExposure.setText('Exposure:   trig ')
-            self.labelExposure.setText(f'Exposure: {states["exposure"]*1000:>5.0f}ms')
+            self.labelExposure.setText(f'Exposure: {states["exposure"] * 1000:>5.0f}ms')
 
     @QtCore.pyqtSlot(np.ndarray)
     def update_image(self, image):
@@ -132,7 +140,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot()
     def update_exposure(self):
         try:
-            time = float(self.lineEditExposure.text())/1000
+            time = float(self.lineEditExposure.text()) / 1000
         except (ValueError, TypeError):
             log.warning(f'setting exposure: cannot convert {self.lineEditExposure.text()} to float')
             return
@@ -153,7 +161,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
     def reset_progress_bar(self):
         if self.dectris_image_grabber.connected:
-            time = self.progressBarExposure.setMaximum(int(self.dectris_image_grabber.Q.frame_time*100))
+            time = self.progressBarExposure.setMaximum(int(self.dectris_image_grabber.Q.frame_time * 100))
         else:
             time = 100
         self.progressBarExposure.setValue(0)
@@ -168,7 +176,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
     def add_rect_roi(self):
         if self.image is not None:
             log.info('added rectangular ROI')
-            roi = pg.RectROI((self.image.shape[0]/2-50, self.image.shape[1]/2-50), (100, 100),
+            roi = pg.RectROI((self.image.shape[0] / 2 - 50, self.image.shape[1] / 2 - 50), (100, 100),
                              centered=True, sideScalers=True,
                              pen=pg.mkPen('c', width=2), hoverPen=pg.mkPen('c', width=3),
                              handlePen=pg.mkPen('w', width=3), handleHoverPen=pg.mkPen('w', width=4))
