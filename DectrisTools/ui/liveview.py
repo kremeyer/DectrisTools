@@ -46,6 +46,10 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
         self.actionAddRectangle.triggered.connect(self.add_rect_roi)
         self.actionAddRectangle.setShortcut('R')
+        self.actionRemoveLastROI.triggered.connect(self.remove_last_roi)
+        self.actionRemoveLastROI.setShortcut('Ctrl+R')
+        self.actionRemoveAllROIs.triggered.connect(self.remove_all_rois)
+        self.actionRemoveAllROIs.setShortcut('Ctrl+Shift+R')
         self.actionLinkYAxis.triggered.connect(self.update_y_axis_link)
         self.actionLinkYAxis.setShortcut('Y')
         self.actionAutoRange.setShortcut('A')
@@ -220,7 +224,10 @@ class LiveViewUi(QtWidgets.QMainWindow):
     def update_all_rois(self):
         for i in self.viewer.view.addedItems:
             if isinstance(i, pg.RectROI):
-                self.update_roi(i)
+                try:
+                    self.update_roi(i)
+                except Exception:  # bad practice, but works for now...
+                    pass
 
     @QtCore.pyqtSlot(tuple)
     def remove_roi(self, roi):
@@ -236,3 +243,11 @@ class LiveViewUi(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot()
     def start_acquisition(self):
         self.dectris_image_grabber.image_grabber_thread.start()
+
+    @QtCore.pyqtSlot()
+    def remove_last_roi(self):
+        pass
+
+    @QtCore.pyqtSlot()
+    def remove_all_rois(self):
+        pass

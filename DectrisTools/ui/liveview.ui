@@ -123,6 +123,8 @@
      <string>ROI</string>
     </property>
     <addaction name="actionAddRectangle"/>
+    <addaction name="actionRemoveLastROI"/>
+    <addaction name="actionRemoveAllROIs"/>
     <addaction name="actionLinkYAxis"/>
    </widget>
    <widget class="QMenu" name="menuView">

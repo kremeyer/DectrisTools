@@ -86,7 +86,7 @@ class DectrisImageGrabber(QObject):
             sleep(1)
             x = np.linspace(-10, 10, 512)
             xs, ys = np.meshgrid(x, x)
-            img = 5e4 * ((np.cos(np.hypot(xs, ys)) / (np.hypot(xs, ys)+1) * np.random.normal(1, 0.1, (512, 512))) + 0.3)
+            img = 5e4 * ((np.cos(np.hypot(xs, ys)) / (np.hypot(xs, ys)+1) * np.random.normal(1, 0.4, (512, 512))) + 0.3)
             self.image_ready.emit(img)
 
         self.image_grabber_thread.quit()
