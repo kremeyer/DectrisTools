@@ -36,38 +36,9 @@
          </widget>
         </item>
         <item>
-         <widget class="QLabel" name="label">
-          <property name="text">
-           <string>Trigger Mode</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QComboBox" name="comboBoxTriggerMode">
-          <property name="toolTip">
-           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-family:'sans-serif'; font-weight:600;&quot;&gt;INTS - Internal Software) Triggering&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-family:'sans-serif';&quot;&gt;the detector is not synced with anything and consecutively takes images&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-family:'sans-serif'; font-weight:600;&quot;&gt;EXTS - Externally Triggered Exposure Series&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-family:'sans-serif';&quot;&gt;the detector will take an image with the set exposure time, beginning with the rising edge of the trigger signal&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-family:'sans-serif'; font-weight:600;&quot;&gt;EXTE - Externally Enabled Exposure Series&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-family:'sans-serif';&quot;&gt;the detector will take an image with the rising edge of the trigger, exposure will stop with falling edge of the trigger&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-          </property>
-          <item>
-           <property name="text">
-            <string extracomment="Internal Software Triggering">ints</string>
-           </property>
-          </item>
-          <item>
-           <property name="text">
-            <string extracomment="Externally Triggered Exposure Series">exts</string>
-           </property>
-          </item>
-          <item>
-           <property name="text">
-            <string extracomment="Externally Enabled Exposure Series">exte</string>
-           </property>
-          </item>
-         </widget>
-        </item>
-        <item>
          <widget class="QLabel" name="label_2">
           <property name="text">
-           <string>Exposure Time [ms]</string>
+           <string>Live Exposure [ms]</string>
           </property>
          </widget>
         </item>
@@ -81,6 +52,29 @@
           </property>
           <property name="text">
            <string>300</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="label">
+          <property name="text">
+           <string>Capture Exposure [ms]</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="lineEditCapture">
+          <property name="maximumSize">
+           <size>
+            <width>100</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>15000</string>
           </property>
           <property name="alignment">
            <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -134,8 +128,17 @@
     <addaction name="actionShowProjections"/>
     <addaction name="actionAutoRange"/>
    </widget>
+   <widget class="QMenu" name="menuTiggerMode">
+    <property name="title">
+     <string>Tigger Mode</string>
+    </property>
+    <addaction name="actionINTS"/>
+    <addaction name="actionEXTS"/>
+    <addaction name="actionEXTE"/>
+   </widget>
    <addaction name="menuROI"/>
    <addaction name="menuView"/>
+   <addaction name="menuTiggerMode"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionAddRectangle">
@@ -199,6 +202,33 @@
   <action name="actionRemoveAllROIs">
    <property name="text">
     <string>Remove All ROIs</string>
+   </property>
+  </action>
+  <action name="actionINTS">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>ints</string>
+   </property>
+  </action>
+  <action name="actionEXTS">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>exts</string>
+   </property>
+  </action>
+  <action name="actionEXTE">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>exte</string>
    </property>
   </action>
  </widget>

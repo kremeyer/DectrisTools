@@ -25,7 +25,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.update_interval = cmd_args.update_interval
 
         self.dectris_image_grabber = DectrisImageGrabber(cmd_args.ip, cmd_args.port,
-                                                         trigger_mode=self.comboBoxTriggerMode.currentText(),
+                                                         trigger_mode='ints',
                                                          exposure=float(self.lineEditExposure.text()) / 1000)
         self.dectris_status_grabber = DectrisStatusGrabber(cmd_args.ip, cmd_args.port)
         self.exposure_progress_worker = ConstantPing()
@@ -41,25 +41,15 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
         self.exposure_progress_worker.advance_progress_bar.connect(self.advance_progress_bar)
 
+        self.lineEditExposure.returnPressed.connect(self.update_exposure)
+        self.lineEditCapture.returnPressed.connect(self.capture_image)
+
         self.labelIntensity = QtWidgets.QLabel()
         self.labelState = QtWidgets.QLabel()
         self.labelTrigger = QtWidgets.QLabel()
         self.labelExposure = QtWidgets.QLabel()
 
-        self.actionAddRectangle.triggered.connect(self.add_rect_roi)
-        self.actionAddRectangle.setShortcut('R')
-        self.actionRemoveLastROI.triggered.connect(self.remove_last_roi)
-        self.actionRemoveLastROI.setShortcut('Shift+R')
-        self.actionRemoveAllROIs.triggered.connect(self.remove_all_rois)
-        self.actionRemoveAllROIs.setShortcut('Ctrl+Shift+R')
-        self.actionLinkYAxis.triggered.connect(self.update_y_axis_link)
-        self.actionLinkYAxis.setShortcut('Y')
-        self.actionAutoRange.setShortcut('A')
-        self.actionShowProjections.setShortcut('P')
-
-        self.comboBoxTriggerMode.currentIndexChanged.connect(self.update_trigger_mode)
-        self.lineEditExposure.returnPressed.connect(self.update_exposure)
-
+        self.init_menubar()
         self.init_statusbar()
         self.reset_progress_bar()
 
@@ -99,6 +89,29 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.statusbar.addPermanentWidget(self.labelState)
         self.statusbar.addPermanentWidget(self.labelTrigger)
         self.statusbar.addPermanentWidget(self.labelExposure)
+
+    def init_menubar(self):
+        self.actionAddRectangle.triggered.connect(self.add_rect_roi)
+        self.actionAddRectangle.setShortcut('R')
+        self.actionRemoveLastROI.triggered.connect(self.remove_last_roi)
+        self.actionRemoveLastROI.setShortcut('Shift+R')
+        self.actionRemoveAllROIs.triggered.connect(self.remove_all_rois)
+        self.actionRemoveAllROIs.setShortcut('Ctrl+Shift+R')
+        self.actionLinkYAxis.triggered.connect(self.update_y_axis_link)
+        self.actionLinkYAxis.setShortcut('Y')
+        self.actionAutoRange.setShortcut('A')
+        self.actionShowProjections.setShortcut('P')
+
+        trigger_mode_group = QtWidgets.QActionGroup(self)
+        trigger_mode_group.addAction(self.actionINTS)
+        trigger_mode_group.addAction(self.actionEXTS)
+        trigger_mode_group.addAction(self.actionEXTE)
+        self.actionINTS.triggered.connect(self.update_trigger_mode)
+        self.actionINTS.setShortcut('Ctrl+1')
+        self.actionEXTS.triggered.connect(self.update_trigger_mode)
+        self.actionEXTS.setShortcut('Ctrl+2')
+        self.actionEXTE.triggered.connect(self.update_trigger_mode)
+        self.actionEXTE.setShortcut('Ctrl+3')
 
     @QtCore.pyqtSlot(tuple)
     def update_label_intensity(self, xy):
@@ -150,12 +163,39 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
     @interrupt_acquisition
     @QtCore.pyqtSlot()
+    def capture_image(self):
+        # UNTESTED METHOD, CONNECT TO DECTRIS AND DEBUG
+        log.info('capturing image')
+        if self.dectris_image_grabber.connected:
+            if self.dectris_image_grabber.Q.trigger_mode == 'ints':
+                try:
+                    time = float(self.lineEditCapture.text()) / 1000
+                except (ValueError, TypeError):
+                    log.warning(f'image capture: cannot convert {self.lineEditCapture.text()} to float')
+                    return
+                self.dectris_image_grabber.Q.count_time = time
+                self.dectris_image_grabber.Q.frame_time = time
+
+                self.dectris_image_grabber.image_ready.connect(self.show_captured_image)
+                self.dectris_image_grabber.image_grabber_thread.start()
+
+    @QtCore.pyqtSlot(np.ndarray)
+    def show_captured_image(self):
+        self.dectris_image_grabber.image_ready.connect(self.update_image)
+        self.update_exposure()
+
+    @interrupt_acquisition
+    @QtCore.pyqtSlot()
     def update_trigger_mode(self):
-        mode = self.comboBoxTriggerMode.currentText()
-        if mode == 'exte':
-            self.lineEditExposure.setEnabled(False)
-        else:
+        if self.actionINTS.isChecked():
+            mode = 'ints'
             self.lineEditExposure.setEnabled(True)
+        elif self.actionEXTS.isChecked():
+            mode = 'exts'
+            self.lineEditExposure.setEnabled(True)
+        else:
+            mode = 'exte'
+            self.lineEditExposure.setEnabled(False)
         log.info(f'changing trigger mode to {mode}')
         if self.dectris_image_grabber.connected:
             self.dectris_image_grabber.Q.trigger_mode = mode
