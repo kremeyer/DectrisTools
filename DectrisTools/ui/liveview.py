@@ -13,6 +13,8 @@ class LiveViewUi(QtWidgets.QMainWindow):
     main window of the LiveView application
     """
     image = None
+    x_projection = pg.PlotCurveItem()
+    y_projection = pg.PlotCurveItem()
     i_digits = 5
     update_interval = None
 
@@ -47,7 +49,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.actionAddRectangle.triggered.connect(self.add_rect_roi)
         self.actionAddRectangle.setShortcut('R')
         self.actionRemoveLastROI.triggered.connect(self.remove_last_roi)
-        self.actionRemoveLastROI.setShortcut('Ctrl+R')
+        self.actionRemoveLastROI.setShortcut('Shift+R')
         self.actionRemoveAllROIs.triggered.connect(self.remove_all_rois)
         self.actionRemoveAllROIs.setShortcut('Ctrl+Shift+R')
         self.actionLinkYAxis.triggered.connect(self.update_y_axis_link)
@@ -65,6 +67,9 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.status_timer.start(200)
 
         self.roi_view = ROIView(title='ROIs')
+
+        self.viewer.addItem(self.x_projection)
+        self.viewer.addItem(self.y_projection)
         self.show()
 
     def closeEvent(self, evt):
@@ -125,15 +130,18 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.viewer.setImage(image, autoRange=self.actionAutoRange.isChecked(),
                              autoLevels=self.actionAutoRange.isChecked())
         if self.actionShowProjections.isChecked():
-            x_projection = np.mean(image, axis=0)
-            x_projection /= np.mean(x_projection)
-            x_projection *= image.shape[1]*0.1
-            self.viewer.addItem(pg.PlotCurveItem(x=x_projection, y=np.arange(0, image.shape[1])+0.5))
+            x_projection_data = np.mean(image, axis=0)
+            x_projection_data /= np.mean(x_projection_data)
+            x_projection_data *= image.shape[1]*0.1
+            self.x_projection.setData(x=x_projection_data, y=np.arange(0, image.shape[1])+0.5)
 
-            y_projection = np.mean(image, axis=1)
-            y_projection /= np.max(y_projection)
-            y_projection *= image.shape[0]*0.1  # make plot span 10% of the image
-            self.viewer.addItem(pg.PlotCurveItem(x=np.arange(0, image.shape[0])+0.5, y=y_projection, clear=True))
+            y_projection_data = np.mean(image, axis=1)
+            y_projection_data /= np.max(y_projection_data)
+            y_projection_data *= image.shape[0]*0.1  # make plot span 10% of the image
+            self.y_projection.setData(x=np.arange(0, image.shape[0])+0.5, y=y_projection_data)
+        else:
+            self.x_projection.clear()
+            self.y_projection.clear()
         self.i_digits = len(str(int(image.max(initial=1))))
         self.update_all_rois()
         self.exposure_progress_worker.progress_thread.requestInterruption()
@@ -246,8 +254,19 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
     @QtCore.pyqtSlot()
     def remove_last_roi(self):
-        pass
+        for i in self.viewer.view.addedItems[::-1]:
+            if isinstance(i, pg.ROI):
+                try:
+                    self.remove_roi(i)
+                    return
+                except Exception:  # again bad practice, but works...
+                    pass
 
     @QtCore.pyqtSlot()
     def remove_all_rois(self):
-        pass
+        for i in self.viewer.view.addedItems[::-1]:
+            if isinstance(i, pg.ROI):
+                try:
+                    self.remove_roi(i)
+                except Exception:  # again bad practice, but works...
+                    pass
