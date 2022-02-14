@@ -6,6 +6,7 @@ import pyqtgraph as pg
 from .. import get_base_path
 from ..lib.Utils import DectrisImageGrabber, DectrisStatusGrabber, ConstantPing, interrupt_acquisition
 from .widgets import ROIView
+from ..ui.captured import CapturedUi
 
 
 class LiveViewUi(QtWidgets.QMainWindow):
@@ -178,9 +179,12 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
                 self.dectris_image_grabber.image_ready.connect(self.show_captured_image)
                 self.dectris_image_grabber.image_grabber_thread.start()
+        else:
+            self.show_captured_image(np.random.rand(512, 512) * 2**16)
 
     @QtCore.pyqtSlot(np.ndarray)
-    def show_captured_image(self):
+    def show_captured_image(self, image):
+        ui = CapturedUi(image, parent=self)
         self.dectris_image_grabber.image_ready.connect(self.update_image)
         self.update_exposure()
 

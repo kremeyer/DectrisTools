@@ -5,13 +5,13 @@ from numpy import sqrt, ceil, NaN
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
 
 
-class LiveViewWidget(pg.ImageView):
+class ImageViewWidget(pg.ImageView):
     x_size = 0
     y_size = 0
     cursor_changed = pyqtSignal(tuple)
 
     def __init__(self, parent=None):
-        log.debug('initializing LiveView')
+        log.debug('initializing ImageViewWidget')
         super().__init__()
         self.setParent(parent)
         self.setPredefinedGradient('inferno')
