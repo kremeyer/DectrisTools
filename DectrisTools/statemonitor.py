@@ -4,7 +4,7 @@ module to continiously print the current state of the detector and it's subsyste
 import os
 from argparse import ArgumentParser
 from time import sleep
-from .Quadro import Quadro
+from uedinst.dectris import Quadro
 
 
 def parse_args():

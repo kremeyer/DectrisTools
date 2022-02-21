@@ -7,7 +7,7 @@ import io
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, QObject, QThread
 import numpy as np
 from PIL import Image
-from ..Quadro import Quadro
+from uedinst.dectris import Quadro
 
 
 class DectrisImageGrabber(QObject):
