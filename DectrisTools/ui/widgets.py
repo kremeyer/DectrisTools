@@ -3,6 +3,7 @@ import logging as log
 import pyqtgraph as pg
 from numpy import sqrt, ceil, NaN
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
+from PyQt5.QtGui import QFont
 
 
 class ImageViewWidget(pg.ImageView):
@@ -16,6 +17,11 @@ class ImageViewWidget(pg.ImageView):
         self.setParent(parent)
         self.setPredefinedGradient('inferno')
         self.setLevels(0, 2**16)
+        font_hist_label = QFont()
+        font_hist_label.setPointSize(16)
+        self.ui.histogram.axis.setStyle(tickFont=font_hist_label)
+        self.ui.histogram.axis.setStyle(autoExpandTextSpace=True)
+        self.ui.histogram.axis.setStyle(tickTextOffset=-10)
         self.ui.roiBtn.hide()
         self.ui.menuBtn.hide()
         self.view.invertY(False)
