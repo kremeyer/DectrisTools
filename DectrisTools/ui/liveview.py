@@ -54,7 +54,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.init_statusbar()
         self.reset_progress_bar()
 
-        self.image_timer.start(self.update_interval)
+        # self.image_timer.start(self.update_interval)
         self.status_timer.start(200)
 
         self.roi_view = ROIView(title='ROIs')
@@ -107,12 +107,15 @@ class LiveViewUi(QtWidgets.QMainWindow):
         trigger_mode_group.addAction(self.actionINTS)
         trigger_mode_group.addAction(self.actionEXTS)
         trigger_mode_group.addAction(self.actionEXTE)
+        trigger_mode_group.addAction(self.actionStop)
         self.actionINTS.triggered.connect(self.update_trigger_mode)
         self.actionINTS.setShortcut('Ctrl+1')
         self.actionEXTS.triggered.connect(self.update_trigger_mode)
         self.actionEXTS.setShortcut('Ctrl+2')
         self.actionEXTE.triggered.connect(self.update_trigger_mode)
         self.actionEXTE.setShortcut('Ctrl+3')
+        self.actionStop.triggered.connect(self.update_trigger_mode)
+        self.actionStop.setShortcut('Esc')
 
     @QtCore.pyqtSlot(tuple)
     def update_label_intensity(self, xy):
@@ -174,37 +177,47 @@ class LiveViewUi(QtWidgets.QMainWindow):
                 except (ValueError, TypeError):
                     log.warning(f'image capture: cannot convert {self.lineEditCapture.text()} to float')
                     return
+                
+                self.dectris_image_grabber.Q.trigger_mode = 'ints'
                 self.dectris_image_grabber.Q.count_time = time
                 self.dectris_image_grabber.Q.frame_time = time
 
+                self.dectris_image_grabber.image_ready.disconnect(self.update_image)
                 self.dectris_image_grabber.image_ready.connect(self.show_captured_image)
                 self.dectris_image_grabber.image_grabber_thread.start()
-        else:
-            self.show_captured_image(np.random.rand(512, 512) * 2**16)
 
     @QtCore.pyqtSlot(np.ndarray)
     def show_captured_image(self, image):
-        ui = CapturedUi(image, parent=self)
+        log.info('showing captured image')
+        self.dectris_image_grabber.image_ready.disconnect(self.show_captured_image)
         self.dectris_image_grabber.image_ready.connect(self.update_image)
+        CapturedUi(image, parent=self)
         self.update_exposure()
+        self.update_trigger_mode()
 
     @interrupt_acquisition
     @QtCore.pyqtSlot()
     def update_trigger_mode(self):
-        if self.actionINTS.isChecked():
-            mode = 'ints'
-            self.lineEditExposure.setEnabled(True)
-        elif self.actionEXTS.isChecked():
-            mode = 'exts'
-            self.lineEditExposure.setEnabled(True)
+        if self.actionStop.isChecked():
+            self.image_timer.stop()
+            self.progressBarExposure.setValue(self.progressBarExposure.minimum())
         else:
-            mode = 'exte'
-            self.lineEditExposure.setEnabled(False)
-        log.info(f'changing trigger mode to {mode}')
-        if self.dectris_image_grabber.connected:
-            self.dectris_image_grabber.Q.trigger_mode = mode
-        else:
-            log.warning(f'could not change trigger mode, detector disconnected')
+            if not self.image_timer.isActive():
+                self.image_timer.start(self.update_interval)
+            if self.actionINTS.isChecked():
+                mode = 'ints'
+                self.lineEditExposure.setEnabled(True)
+            elif self.actionEXTS.isChecked():
+                mode = 'exts'
+                self.lineEditExposure.setEnabled(True)
+            else:
+                mode = 'exte'
+                self.lineEditExposure.setEnabled(False)
+            log.info(f'changing trigger mode to {mode}')
+            if self.dectris_image_grabber.connected:
+                self.dectris_image_grabber.Q.trigger_mode = mode
+            else:
+                log.warning(f'could not change trigger mode, detector disconnected')
 
     @interrupt_acquisition
     @QtCore.pyqtSlot()

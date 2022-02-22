@@ -109,7 +109,7 @@
      <x>0</x>
      <y>0</y>
      <width>810</width>
-     <height>22</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuROI">
@@ -135,6 +135,7 @@
     <addaction name="actionINTS"/>
     <addaction name="actionEXTS"/>
     <addaction name="actionEXTE"/>
+    <addaction name="actionStop"/>
    </widget>
    <addaction name="menuROI"/>
    <addaction name="menuView"/>
@@ -209,7 +210,7 @@
     <bool>true</bool>
    </property>
    <property name="checked">
-    <bool>true</bool>
+    <bool>false</bool>
    </property>
    <property name="text">
     <string>ints</string>
@@ -229,6 +230,17 @@
    </property>
    <property name="text">
     <string>exte</string>
+   </property>
+  </action>
+  <action name="actionStop">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>stop</string>
    </property>
   </action>
  </widget>

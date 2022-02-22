@@ -183,7 +183,9 @@ def interrupt_acquisition(f):
                 self.dectris_image_grabber.Q.abort()
                 self.dectris_image_grabber.image_grabber_thread.requestInterruption()
                 self.dectris_image_grabber.image_grabber_thread.wait()
+                self.dectris_image_grabber.Q.mon.clear()
         f(self)
-        log.debug('restarting liveview')
-        self.image_timer.start(self.update_interval)
+        if not self.actionStop.isChecked():
+            log.debug('restarting liveview')
+            self.image_timer.start(self.update_interval)
     return wrapper

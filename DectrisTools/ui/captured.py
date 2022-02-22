@@ -2,7 +2,7 @@ from os import path
 import logging as log
 from datetime import datetime
 import numpy as np
-from PyQt5 import QtWidgets, QtCore, uic
+from PyQt5 import QtWidgets, QtCore, QtGui, uic
 from .. import get_base_path
 
 
@@ -20,6 +20,9 @@ class CapturedUi(QtWidgets.QMainWindow):
 
         self.viewer.cursor_changed.connect(self.update_statusbar)
         self.setWindowTitle(f'Captured Image - {datetime.now().strftime("%Y%m%d %H%M%S")}')
+
+        QtWidgets.QShortcut(QtGui.QKeySequence('Ctrl+W'), self).activated.connect(self.close)
+
         self.show()
 
     @QtCore.pyqtSlot(tuple)
