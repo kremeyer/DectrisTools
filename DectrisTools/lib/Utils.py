@@ -78,7 +78,7 @@ class DectrisImageGrabber(QObject):
                     return
                 sleep(0.05)
             # image comes as a file-like object in tif format and is emitted as np.ndarray
-            self.image_ready.emit(np.fliplr(np.rot90(np.array(Image.open(io.BytesIO(self.Q.mon.last_image))), k=3)))
+            self.image_ready.emit(np.rot90(np.array(Image.open(io.BytesIO(self.Q.mon.last_image))), k=3))
             self.Q.mon.clear()
         else:
             # simulated image for @home use

@@ -54,7 +54,6 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.init_statusbar()
         self.reset_progress_bar()
 
-        # self.image_timer.start(self.update_interval)
         self.status_timer.start(200)
 
         self.roi_view = ROIView(title='ROIs')
@@ -102,6 +101,8 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.actionLinkYAxis.setShortcut('Y')
         self.actionAutoRange.setShortcut('A')
         self.actionShowProjections.setShortcut('P')
+        self.actionShowMaxPixelValue.triggered.connect(self.update_show_max_pixel_value)
+        self.actionShowMaxPixelValue.setShortcut('M')
 
         trigger_mode_group = QtWidgets.QActionGroup(self)
         trigger_mode_group.addAction(self.actionINTS)
@@ -168,7 +169,6 @@ class LiveViewUi(QtWidgets.QMainWindow):
     @interrupt_acquisition
     @QtCore.pyqtSlot()
     def capture_image(self):
-        # UNTESTED METHOD, CONNECT TO DECTRIS AND DEBUG
         log.info('capturing image')
         if self.dectris_image_grabber.connected:
             if self.dectris_image_grabber.Q.trigger_mode == 'ints':
@@ -327,3 +327,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
                     self.remove_roi(i)
                 except Exception:  # again bad practice, but works...
                     pass
+
+    @QtCore.pyqtSlot()
+    def update_show_max_pixel_value(self):
+        self.viewer.show_max = self.actionShowMaxPixelValue.isChecked()

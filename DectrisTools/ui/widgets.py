@@ -3,7 +3,6 @@ import logging as log
 import pyqtgraph as pg
 from numpy import sqrt, ceil, NaN
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
-from PyQt5.QtGui import QFont
 
 
 class ImageViewWidget(pg.ImageView):
@@ -11,22 +10,29 @@ class ImageViewWidget(pg.ImageView):
     y_size = 0
     cursor_changed = pyqtSignal(tuple)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, show_max=True, cmap='inferno'):
         log.debug('initializing ImageViewWidget')
         super().__init__()
         self.setParent(parent)
-        self.setPredefinedGradient('inferno')
+        self.setPredefinedGradient(cmap)
         self.setLevels(0, 2**16)
-        font_hist_label = QFont()
-        font_hist_label.setPointSize(16)
-        self.ui.histogram.axis.setStyle(tickFont=font_hist_label)
-        self.ui.histogram.axis.setStyle(autoExpandTextSpace=True)
-        self.ui.histogram.axis.setStyle(tickTextOffset=-10)
         self.ui.roiBtn.hide()
         self.ui.menuBtn.hide()
-        self.view.invertY(False)
+
+        self.max_label = pg.LabelItem(justify='right')
+        self.addItem(self.max_label)
+
+        self.view.invertY(True)
         self.proxy = pg.SignalProxy(self.scene.sigMouseMoved,
                                     rateLimit=60, slot=self.__callback_move)
+        self.show_max = show_max
+
+    def setImage(self, *args, **kwargs):
+        if self.show_max:
+            self.max_label.setText(f'<span style="font-size: 32pt">{int(args[0].max())}</span>')
+        else:
+            self.max_label.setText('')
+        super().setImage(*args, **kwargs)
 
     @pyqtSlot(tuple)
     def __callback_move(self, evt):
