@@ -128,6 +128,7 @@
     <addaction name="actionShowProjections"/>
     <addaction name="actionAutoRange"/>
     <addaction name="actionShowMaxPixelValue"/>
+    <addaction name="actionShowFrame"/>
    </widget>
    <widget class="QMenu" name="menuTiggerMode">
     <property name="title">
@@ -253,6 +254,14 @@
    </property>
    <property name="text">
     <string>Show Max Pixel Value</string>
+   </property>
+  </action>
+  <action name="actionShowFrame">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show Frame</string>
    </property>
   </action>
  </widget>

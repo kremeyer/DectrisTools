@@ -10,7 +10,7 @@ class ImageViewWidget(pg.ImageView):
     y_size = 0
     cursor_changed = pyqtSignal(tuple)
 
-    def __init__(self, parent=None, show_max=True, cmap='inferno'):
+    def __init__(self, parent=None, show_max=True, show_frame=True, cmap='inferno'):
         log.debug('initializing ImageViewWidget')
         super().__init__()
         self.setParent(parent)
@@ -22,16 +22,34 @@ class ImageViewWidget(pg.ImageView):
         self.max_label = pg.LabelItem(justify='right')
         self.addItem(self.max_label)
 
+        self.frame_top = pg.InfiniteLine(angle=0, movable=False)
+        self.frame_bottom = pg.InfiniteLine(angle=0, movable=False)
+        self.frame_left = pg.InfiniteLine(angle=90, movable=False)
+        self.frame_right = pg.InfiniteLine(angle=90, movable=False)
+        self.frames = [self.frame_top, self.frame_bottom, self.frame_left, self.frame_right]
+
         self.view.invertY(True)
         self.proxy = pg.SignalProxy(self.scene.sigMouseMoved,
                                     rateLimit=60, slot=self.__callback_move)
         self.show_max = show_max
+        self.show_frame = show_frame
 
     def setImage(self, *args, **kwargs):
+        self.x_size, self.y_size = args[0].shape
         if self.show_max:
             self.max_label.setText(f'<span style="font-size: 32pt">{int(args[0].max())}</span>')
         else:
             self.max_label.setText('')
+        if self.show_frame:
+            self.frame_top.setPos(self.y_size)
+            self.frame_bottom.setPos(0)
+            self.frame_left.setPos(0)
+            self.frame_right.setPos(self.x_size)
+            for f in self.frames:
+                self.addItem(f)
+        else:
+            for f in self.frames:
+                self.removeItem(f)
         super().setImage(*args, **kwargs)
 
     @pyqtSlot(tuple)

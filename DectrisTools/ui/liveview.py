@@ -103,6 +103,8 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.actionShowProjections.setShortcut('P')
         self.actionShowMaxPixelValue.triggered.connect(self.update_show_max_pixel_value)
         self.actionShowMaxPixelValue.setShortcut('M')
+        self.actionShowFrame.triggered.connect(self.update_show_frame)
+        self.actionShowFrame.setShortcut('F')
 
         trigger_mode_group = QtWidgets.QActionGroup(self)
         trigger_mode_group.addAction(self.actionINTS)
@@ -143,7 +145,6 @@ class LiveViewUi(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot(np.ndarray)
     def update_image(self, image):
         self.image = image
-        self.viewer.x_size, self.viewer.y_size = image.shape
         self.viewer.clear()
         self.viewer.setImage(image, autoRange=self.actionAutoRange.isChecked(),
                              autoLevels=self.actionAutoRange.isChecked())
@@ -331,3 +332,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot()
     def update_show_max_pixel_value(self):
         self.viewer.show_max = self.actionShowMaxPixelValue.isChecked()
+
+    @QtCore.pyqtSlot()
+    def update_show_frame(self):
+        self.viewer.show_frame = self.actionShowFrame.isChecked()
