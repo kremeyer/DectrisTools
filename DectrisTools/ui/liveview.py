@@ -14,8 +14,6 @@ class LiveViewUi(QtWidgets.QMainWindow):
     main window of the LiveView application
     """
     image = None
-    x_projection = pg.PlotCurveItem()
-    y_projection = pg.PlotCurveItem()
     i_digits = 5
     update_interval = None
 
@@ -58,8 +56,6 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
         self.roi_view = ROIView(title='ROIs')
 
-        self.viewer.addItem(self.x_projection)
-        self.viewer.addItem(self.y_projection)
         self.show()
 
     def closeEvent(self, evt):
@@ -99,11 +95,10 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.actionRemoveAllROIs.setShortcut('Ctrl+Shift+R')
         self.actionLinkYAxis.triggered.connect(self.update_y_axis_link)
         self.actionLinkYAxis.setShortcut('Y')
-        self.actionAutoRange.setShortcut('A')
         self.actionShowProjections.setShortcut('P')
-        self.actionShowMaxPixelValue.triggered.connect(self.update_show_max_pixel_value)
+        self.actionAutoLevels.setShortcut('L')
         self.actionShowMaxPixelValue.setShortcut('M')
-        self.actionShowFrame.triggered.connect(self.update_show_frame)
+        self.actionShowFrame.triggered.connect(lambda x=self.actionShowFrame.isChecked(): self.viewer.show_frame(x))
         self.actionShowFrame.setShortcut('F')
 
         trigger_mode_group = QtWidgets.QActionGroup(self)
@@ -146,21 +141,11 @@ class LiveViewUi(QtWidgets.QMainWindow):
     def update_image(self, image):
         self.image = image
         self.viewer.clear()
-        self.viewer.setImage(image, autoRange=self.actionAutoRange.isChecked(),
-                             autoLevels=self.actionAutoRange.isChecked())
-        if self.actionShowProjections.isChecked():
-            x_projection_data = np.mean(image, axis=0)
-            x_projection_data /= np.mean(x_projection_data)
-            x_projection_data *= image.shape[1]*0.1
-            self.x_projection.setData(x=x_projection_data, y=np.arange(0, image.shape[1])+0.5)
-
-            y_projection_data = np.mean(image, axis=1)
-            y_projection_data /= np.max(y_projection_data)
-            y_projection_data *= image.shape[0]*0.1  # make plot span 10% of the image
-            self.y_projection.setData(x=np.arange(0, image.shape[0])+0.5, y=y_projection_data)
-        else:
-            self.x_projection.clear()
-            self.y_projection.clear()
+        self.viewer.setImage(image,
+                             autoHistogramRange=self.actionAutoLevels.isChecked(),
+                             autoLevels=self.actionAutoLevels.isChecked(),
+                             max_label=self.actionShowMaxPixelValue.isChecked(),
+                             projections=self.actionShowProjections.isChecked(),)
         self.i_digits = len(str(int(image.max(initial=1))))
         self.update_all_rois()
         self.exposure_progress_worker.progress_thread.requestInterruption()
@@ -328,11 +313,3 @@ class LiveViewUi(QtWidgets.QMainWindow):
                     self.remove_roi(i)
                 except Exception:  # again bad practice, but works...
                     pass
-
-    @QtCore.pyqtSlot()
-    def update_show_max_pixel_value(self):
-        self.viewer.show_max = self.actionShowMaxPixelValue.isChecked()
-
-    @QtCore.pyqtSlot()
-    def update_show_frame(self):
-        self.viewer.show_frame = self.actionShowFrame.isChecked()
