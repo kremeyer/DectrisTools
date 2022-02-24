@@ -33,6 +33,9 @@ class ImageViewWidget(pg.ImageView):
         self.frame_right = pg.InfiniteLine(angle=90, movable=False)
         self.frames = [self.frame_top, self.frame_bottom, self.frame_left, self.frame_right]
 
+        self.crosshair_h = pg.InfiniteLine(angle=45, movable=False)
+        self.crosshair_v = pg.InfiniteLine(angle=135, movable=False)
+
         self.x_projection = pg.PlotCurveItem()
         self.addItem(self.x_projection)
         self.y_projection = pg.PlotCurveItem()
@@ -44,7 +47,7 @@ class ImageViewWidget(pg.ImageView):
         self.image = args[0]
         self.x_size, self.y_size = self.image.shape
 
-        self.view.setLimits(xMin=-10, xMax=self.x_size+10, yMin=-10, yMax=self.y_size+10)
+        # self.view.setLimits(xMin=-10, xMax=self.x_size+10, yMin=-10, yMax=self.y_size+10)
 
         if max_label:
             self.max_label.setText(f'<span style="font-size: 32pt">{int(self.image.max())}</span>')
@@ -65,7 +68,7 @@ class ImageViewWidget(pg.ImageView):
             self.x_projection.clear()
             self.y_projection.clear()
 
-        super().setImage(*args, **kwargs)
+        super().setImage(*args, autoRange=False, **kwargs)
 
     @pyqtSlot(tuple)
     def __callback_move(self, evt):
@@ -96,11 +99,30 @@ class ImageViewWidget(pg.ImageView):
         items_in_view = copy(self.view.addedItems)
         for i in items_in_view:
             if isinstance(i, pg.InfiniteLine):
-                try:
-                    self.view.addedItems.remove(i)
-                    self.view.removeItem(i)
-                except ValueError:
-                    pass
+                if i.angle in [0, 90]:
+                    try:
+                        self.view.addedItems.remove(i)
+                        self.view.removeItem(i)
+                    except ValueError:
+                        pass
+
+    @pyqtSlot(bool)
+    def show_crosshair(self, state):
+        if state:
+            self.crosshair_h.setPos((self.x_size/2, self.y_size/2))
+            self.addItem(self.crosshair_h)
+            self.crosshair_v.setPos((self.x_size/2, self.y_size/2))
+            self.addItem(self.crosshair_v)
+            return
+        items_in_view = copy(self.view.addedItems)
+        for i in items_in_view:
+            if isinstance(i, pg.InfiniteLine):
+                if i.angle in [45, 135]:
+                    try:
+                        self.view.addedItems.remove(i)
+                        self.view.removeItem(i)
+                    except ValueError:
+                        pass
 
 
 class ROIView(pg.GraphicsLayoutWidget):

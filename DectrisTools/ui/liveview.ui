@@ -129,6 +129,7 @@
     <addaction name="actionAutoLevels"/>
     <addaction name="actionShowMaxPixelValue"/>
     <addaction name="actionShowFrame"/>
+    <addaction name="actionShowCrosshair"/>
    </widget>
    <widget class="QMenu" name="menuTiggerMode">
     <property name="title">
@@ -273,6 +274,14 @@
    </property>
    <property name="text">
     <string>Auto Levels</string>
+   </property>
+  </action>
+  <action name="actionShowCrosshair">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show Crosshair</string>
    </property>
   </action>
  </widget>

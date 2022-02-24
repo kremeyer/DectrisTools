@@ -97,6 +97,8 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.actionLinkYAxis.setShortcut('Y')
         self.actionShowProjections.setShortcut('P')
         self.actionAutoLevels.setShortcut('L')
+        self.actionShowCrosshair.setShortcut('C')
+        self.actionShowCrosshair.triggered.connect(lambda x=self.actionShowCrosshair.isChecked(): self.viewer.show_crosshair(x))
         self.actionShowMaxPixelValue.setShortcut('M')
         self.actionShowFrame.triggered.connect(lambda x=self.actionShowFrame.isChecked(): self.viewer.show_frame(x))
         self.actionShowFrame.setShortcut('F')
