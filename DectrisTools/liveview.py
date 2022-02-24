@@ -7,12 +7,13 @@ import logging as log
 from PyQt5 import QtWidgets
 from argparse import ArgumentParser
 from .ui.liveview import LiveViewUi
+from. import IP, PORT
 
 
 def parse_args():
     parser = ArgumentParser()
-    parser.add_argument('ip', type=str, help='DCU ip address')
-    parser.add_argument('port', type=int, help='DCU port')
+    parser.add_argument('--ip', type=str, default=IP, help='DCU ip address')
+    parser.add_argument('--port', type=int, default=PORT, help='DCU port')
     parser.add_argument('--verbose', action='store_true', help='enable verbose logging')
     parser.add_argument('--update_interval', type=int, default=50, help='time between dectector image calls in ms')
 
