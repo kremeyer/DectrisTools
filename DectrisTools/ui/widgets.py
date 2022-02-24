@@ -10,7 +10,7 @@ class ImageViewWidget(pg.ImageView):
     y_size = 0
     cursor_changed = pyqtSignal(tuple)
 
-    def __init__(self, parent=None, show_max=True, show_frame=True, cmap='inferno'):
+    def __init__(self, parent=None, show_max=True, show_frame=False, cmap='inferno'):
         log.debug('initializing ImageViewWidget')
         super().__init__()
         self.setParent(parent)
@@ -48,8 +48,14 @@ class ImageViewWidget(pg.ImageView):
             for f in self.frames:
                 self.addItem(f)
         else:
-            for f in self.frames:
-                self.removeItem(f)
+            items_in_view = copy(self.view.addedItems)
+            for i in items_in_view:
+                if isinstance(i, pg.InfiniteLine):
+                    try:
+                        self.view.addedItems.remove(i)
+                        self.view.removeItem(i)
+                    except ValueError:
+                        pass
         super().setImage(*args, **kwargs)
 
     @pyqtSlot(tuple)
