@@ -47,6 +47,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.labelState = QtWidgets.QLabel()
         self.labelTrigger = QtWidgets.QLabel()
         self.labelExposure = QtWidgets.QLabel()
+        self.labelStop = QtWidgets.QLabel()
 
         self.init_menubar()
         self.init_statusbar()
@@ -78,6 +79,9 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.labelState.setFont(status_label_font)
         self.labelTrigger.setFont(status_label_font)
         self.labelExposure.setFont(status_label_font)
+        self.labelStop.setFont(status_label_font)
+        self.labelStop.setMinimumWidth(15)
+        self.labelStop.setText('🛑')
 
         self.labelIntensity.setText(f'({"":>4s}, {"":>4s})   {"":>{self.i_digits}s}')
 
@@ -85,6 +89,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.statusbar.addPermanentWidget(self.labelState)
         self.statusbar.addPermanentWidget(self.labelTrigger)
         self.statusbar.addPermanentWidget(self.labelExposure)
+        self.statusbar.addPermanentWidget(self.labelStop)
 
     def init_menubar(self):
         self.actionAddRectangle.triggered.connect(self.add_rect_roi)
@@ -187,9 +192,11 @@ class LiveViewUi(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot()
     def update_trigger_mode(self):
         if self.actionStop.isChecked():
+            self.labelStop.setText('🛑')
             self.image_timer.stop()
             self.progressBarExposure.setValue(self.progressBarExposure.minimum())
         else:
+            self.labelStop.setText('')
             if not self.image_timer.isActive():
                 self.image_timer.start(self.update_interval)
             if self.actionINTS.isChecked():
