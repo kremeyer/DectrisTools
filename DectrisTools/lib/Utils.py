@@ -4,8 +4,11 @@ collection of helper classes and functions
 from time import sleep
 import logging as log
 import io
+from collections import deque
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, QObject, QThread
+from PyQt5.QtWidgets import QAction, QMenu
 import numpy as np
+import pyqtgraph as pg
 from PIL import Image
 from uedinst.dectris import Quadro
 
@@ -189,3 +192,37 @@ def interrupt_acquisition(f):
             log.debug('restarting liveview')
             self.image_timer.start(self.update_interval)
     return wrapper
+
+
+class RectROI(pg.RectROI):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.win = pg.GraphicsLayoutWidget(title='ROI integrated intensity')
+        self.plot = self.win.addPlot()
+        self.plot.axes['left']['item'].setLabel('mean intensity')
+        self.plot.axes['bottom']['item'].setLabel('image index')
+        self.curve = self.plot.plot()
+        self.last_means = deque(maxlen=30)
+
+    def getMenu(self):
+        if self.menu is None:
+            self.menu = QMenu()
+            self.menu.setTitle("ROI")
+            rem_act = QAction("Remove ROI", self.menu)
+            rem_act.triggered.connect(self.removeClicked)
+            self.menu.addAction(rem_act)
+            self.menu.rem_act = rem_act
+            history_act = QAction("Show mean history", self.menu)
+            history_act.triggered.connect(self.integral_plot_clicked)
+            self.menu.addAction(history_act)
+            self.menu.history_act = history_act
+        self.menu.setEnabled(self.contextMenuEnabled())
+        return self.menu
+
+    def integral_plot_clicked(self):
+        self.win.show()
+
+    def add_mean(self, data, img):
+        self.last_means.append(self.getArrayRegion(data, img).mean())
+        self.curve.setData(x=range(-len(self.last_means)+1, 1), y=self.last_means)

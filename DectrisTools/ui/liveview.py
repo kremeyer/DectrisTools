@@ -4,7 +4,7 @@ import numpy as np
 from PyQt5 import QtWidgets, QtCore, QtGui, uic
 import pyqtgraph as pg
 from .. import get_base_path
-from ..lib.Utils import DectrisImageGrabber, DectrisStatusGrabber, ConstantPing, interrupt_acquisition
+from ..lib.Utils import DectrisImageGrabber, DectrisStatusGrabber, ConstantPing, interrupt_acquisition, RectROI
 from .widgets import ROIView
 from ..ui.captured import CapturedUi
 
@@ -61,6 +61,9 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
     def closeEvent(self, evt):
         self.roi_view.hide()
+        for i in self.viewer.view.addedItems:
+            if isinstance(i, RectROI):
+                i.win.hide()
         self.hide()
         self.image_timer.stop()
         self.status_timer.stop()
@@ -254,10 +257,10 @@ class LiveViewUi(QtWidgets.QMainWindow):
     def add_rect_roi(self):
         if self.image is not None:
             log.info('added rectangular ROI')
-            roi = pg.RectROI((self.image.shape[0] / 2 - 50, self.image.shape[1] / 2 - 50), (100, 100),
-                             centered=True, sideScalers=True,
-                             pen=pg.mkPen('c', width=2), hoverPen=pg.mkPen('c', width=3),
-                             handlePen=pg.mkPen('w', width=3), handleHoverPen=pg.mkPen('w', width=4))
+            roi = RectROI((self.image.shape[0] / 2 - 50, self.image.shape[1] / 2 - 50), (100, 100),
+                          centered=True, sideScalers=True,
+                          pen=pg.mkPen('c', width=2), hoverPen=pg.mkPen('c', width=3),
+                          handlePen=pg.mkPen('w', width=3), handleHoverPen=pg.mkPen('w', width=4))
             roi.removable = True
             roi.sigRemoveRequested.connect(self.remove_roi)
             roi.sigRegionChanged.connect(self.update_roi)
@@ -278,12 +281,13 @@ class LiveViewUi(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot(tuple)
     def update_roi(self, roi):
         roi_data = roi.getArrayRegion(self.image, self.viewer.imageItem)
+        roi.add_mean(self.image, self.viewer.imageItem)
         roi.plot_item.clear()
         roi.plot_item.plot(roi_data.mean(axis=np.argmin(roi_data.shape)))
 
     def update_all_rois(self):
         for i in self.viewer.view.addedItems:
-            if isinstance(i, pg.RectROI):
+            if isinstance(i, RectROI):
                 try:
                     self.update_roi(i)
                 except Exception:  # bad practice, but works for now...
@@ -293,6 +297,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
     def remove_roi(self, roi):
         self.viewer.scene.removeItem(roi)
         self.roi_view.removeItem(roi.plot_item)
+        roi.win.hide()
         if len(self.roi_view) == 0:
             self.roi_view.hide()
 
