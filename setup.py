@@ -6,7 +6,7 @@ setup(
     version=VERSION,
     packages=find_packages(),
     include_package_data=True,
-    install_requires=['numpy', 'pyqtgraph', 'PyQt5', 'pillow',
+    install_requires=['numpy', 'pyqtgraph', 'PyQt5', 'pillow', 'tqdm',
                       'uedinst@git+git://github.com/Siwick-Research-Group/uedinst.git'],
     url='https://github.com/kremeyer/DectrisTools',
     license='',
