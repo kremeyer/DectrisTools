@@ -13,6 +13,13 @@ from PIL import Image
 from uedinst.dectris import Quadro
 
 
+def monitor_to_array(bytestring):
+    """
+    image comes as a file-like object in tif format and is returned as a np.ndarray
+    """
+    return np.rot90(np.array(Image.open(io.BytesIO(bytestring))), k=3)
+
+
 class DectrisImageGrabber(QObject):
     """
     class capable of setting the collecting images from the detector in a non-blocking fashion
@@ -45,6 +52,7 @@ class DectrisImageGrabber(QObject):
             self.Q.count_time = exposure
             self.Q.frame_time = exposure
             self.Q.trigger_mode = trigger_mode
+            self.Q.ntrigger = 1
 
         self.image_grabber_thread = QThread()
         self.moveToThread(self.image_grabber_thread)
@@ -80,8 +88,7 @@ class DectrisImageGrabber(QObject):
                     self.image_grabber_thread.quit()
                     return
                 sleep(0.05)
-            # image comes as a file-like object in tif format and is emitted as np.ndarray
-            self.image_ready.emit(np.rot90(np.array(Image.open(io.BytesIO(self.Q.mon.last_image))), k=3))
+            self.image_ready.emit(monitor_to_array(self.Q.mon.last_image))
             self.Q.mon.clear()
         else:
             # simulated image for @home use
