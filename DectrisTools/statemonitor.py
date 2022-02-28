@@ -5,12 +5,13 @@ import os
 from argparse import ArgumentParser
 from time import sleep
 from uedinst.dectris import Quadro
+from . import IP, PORT
 
 
 def parse_args():
     parser = ArgumentParser()
-    parser.add_argument('ip', type=str, help='DCU ip address')
-    parser.add_argument('port', type=int, help='DCU port')
+    parser.add_argument('--ip', type=str, default=IP, help='DCU ip address')
+    parser.add_argument('--port', type=int, default=PORT, help='DCU port')
     parser.add_argument('--update_interval', type=int, default=250, help='time between dectector image calls in ms')
     args = parser.parse_args()
     return args
