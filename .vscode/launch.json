@@ -9,7 +9,6 @@
             "type": "python",
             "request": "launch",
             "module": "DectrisTools.liveview",
-            "args": ["fe80::4ed9:8fff:feca:a8f9", "80"],
         }
     ]
 }
