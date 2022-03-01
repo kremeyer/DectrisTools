@@ -151,14 +151,14 @@ class LiveViewUi(QtWidgets.QMainWindow):
             self.labelState.setText(f'Detector: {"":>7s} Monitor: {"":>7s}')
             self.labelTrigger.setText(f'Trigger: {"":>4s}')
             self.labelExposure.setText(f'Exposure: {"":>5s}  ')
-            self.labelCmode.setText(f'Counting: {"":>8s}')
+            self.labelCmode.setText(f'Counting: {"":>9s}')
         else:
             self.labelState.setText(f'Detector: {states["quadro"]:>7s} Monitor: {states["mon"]:>7s}')
             self.labelTrigger.setText(f'Trigger: {states["trigger_mode"]:>4s}')
             if states['trigger_mode'] == 'exts':
                 self.labelExposure.setText('Exposure:   trig ')
             self.labelExposure.setText(f'Exposure: {states["exposure"] * 1000:>5.0f}ms')
-            self.labelCmode.setText(f'Counting: {states["counting_mode"]:>8s}')
+            self.labelCmode.setText(f'Counting: {states["counting_mode"]:>9s}')
 
     @QtCore.pyqtSlot(np.ndarray)
     def update_image(self, image):
