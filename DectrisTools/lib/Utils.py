@@ -148,9 +148,10 @@ class DectrisStatusGrabber(QObject):
         log.debug(f'started status_grabber_thread {self.status_grabber_thread.currentThread()}')
         if self.connected:
             self.status_ready.emit({'quadro': self.Q.state, 'fw': self.Q.fw.state, 'mon': self.Q.mon.state,
-                                    'trigger_mode': self.Q.trigger_mode, 'exposure': self.Q.frame_time})
+                                    'trigger_mode': self.Q.trigger_mode, 'exposure': self.Q.frame_time,
+                                    'counting_mode': self.Q.counting_mode})
         else:
-            self.status_ready.emit({'quadro': None, 'fw': None, 'mon': None, 'trigger_mode': None, 'exposure': None})
+            self.status_ready.emit({'quadro': None, 'fw': None, 'mon': None, 'trigger_mode': None, 'exposure': None, 'counting_mode': None})
         self.status_grabber_thread.quit()
         log.debug(f'quit status_grabber_thread {self.status_grabber_thread.currentThread()}')
 

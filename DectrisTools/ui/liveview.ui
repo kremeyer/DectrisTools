@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>810</width>
-    <height>750</height>
+    <width>1080</width>
+    <height>1000</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -108,8 +108,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>810</width>
-     <height>22</height>
+     <width>1080</width>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuROI">
@@ -130,18 +130,36 @@
     <addaction name="actionShowFrame"/>
     <addaction name="actionShowCrosshair"/>
    </widget>
-   <widget class="QMenu" name="menuTiggerMode">
+   <widget class="QMenu" name="menuDetector">
     <property name="title">
-     <string>Tigger Mode</string>
+     <string>Detector</string>
     </property>
-    <addaction name="actionINTS"/>
-    <addaction name="actionEXTS"/>
-    <addaction name="actionEXTE"/>
+    <widget class="QMenu" name="menuCounting_Mode">
+     <property name="title">
+      <string>Counting Mode</string>
+     </property>
+     <addaction name="actionCmodeNormal"/>
+     <addaction name="actionCmodeRetrigger"/>
+    </widget>
+    <widget class="QMenu" name="menuTrigger_Mode">
+     <property name="toolTip">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;INTS - Internal Software Trigger&lt;/p&gt;&lt;p&gt;the detector is not synced with anything and consecutively takes images&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;EXTS - Externally Triggered Exposure Series&lt;/p&gt;&lt;p&gt;the detector will take an image with the set exposure time, beginning with the rising edge of the trigger signal&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;EXTE - Externally Enabled Exposure Series&lt;/p&gt;&lt;p&gt;the detector will take an image with the rising edge of the trigger, exposure will stop with falling edge of the trigger&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+     <property name="title">
+      <string>Trigger Mode</string>
+     </property>
+     <addaction name="actionINTS"/>
+     <addaction name="actionEXTS"/>
+     <addaction name="actionEXTE"/>
+    </widget>
+    <addaction name="menuTrigger_Mode"/>
+    <addaction name="menuCounting_Mode"/>
+    <addaction name="separator"/>
     <addaction name="actionStop"/>
    </widget>
    <addaction name="menuROI"/>
    <addaction name="menuView"/>
-   <addaction name="menuTiggerMode"/>
+   <addaction name="menuDetector"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionAddRectangle">
@@ -217,6 +235,9 @@
    <property name="text">
     <string>ints</string>
    </property>
+   <property name="toolTip">
+    <string>ints</string>
+   </property>
   </action>
   <action name="actionEXTS">
    <property name="checkable">
@@ -225,12 +246,18 @@
    <property name="text">
     <string>exts</string>
    </property>
+   <property name="toolTip">
+    <string>exts</string>
+   </property>
   </action>
   <action name="actionEXTE">
    <property name="checkable">
     <bool>true</bool>
    </property>
    <property name="text">
+    <string>exte</string>
+   </property>
+   <property name="toolTip">
     <string>exte</string>
    </property>
   </action>
@@ -281,6 +308,28 @@
    </property>
    <property name="text">
     <string>Show Crosshair</string>
+   </property>
+  </action>
+  <action name="actionCmodeNormal">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>normal</string>
+   </property>
+   <property name="toolTip">
+    <string>normal</string>
+   </property>
+  </action>
+  <action name="actionCmodeRetrigger">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>retrigger</string>
+   </property>
+   <property name="toolTip">
+    <string>retrigger</string>
    </property>
   </action>
  </widget>

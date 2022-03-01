@@ -3,5 +3,5 @@ numpy~=1.22.1
 PyQt5~=5.15.6
 pyqtgraph~=0.12.3
 pillow~=9.0.1
-uedinst>=1.3.2
+uedinst>=1.3.3
 tqdm~=4.63

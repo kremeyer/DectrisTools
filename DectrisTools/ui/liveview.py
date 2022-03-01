@@ -26,6 +26,11 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.dectris_image_grabber = DectrisImageGrabber(cmd_args.ip, cmd_args.port,
                                                          trigger_mode='ints',
                                                          exposure=float(self.lineEditExposure.text()) / 1000)
+        if self.dectris_image_grabber.connected:
+            if self.dectris_image_grabber.Q.counting_mode == 'normal':
+                self.actionCmodeNormal.setChecked(True)
+            elif self.dectris_image_grabber.Q.counting_mode == 'retrigger':
+                self.actionCmodeRetrigger.setChecked(True)
         self.dectris_status_grabber = DectrisStatusGrabber(cmd_args.ip, cmd_args.port)
         self.exposure_progress_worker = ConstantPing()
         self.dectris_image_grabber.exposure_triggered.connect(self.exposure_progress_worker.progress_thread.start)
@@ -47,6 +52,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.labelState = QtWidgets.QLabel()
         self.labelTrigger = QtWidgets.QLabel()
         self.labelExposure = QtWidgets.QLabel()
+        self.labelCmode = QtWidgets.QLabel()
         self.labelStop = QtWidgets.QLabel()
 
         self.init_menubar()
@@ -82,6 +88,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.labelState.setFont(status_label_font)
         self.labelTrigger.setFont(status_label_font)
         self.labelExposure.setFont(status_label_font)
+        self.labelCmode.setFont(status_label_font)
         self.labelStop.setFont(status_label_font)
         self.labelStop.setMinimumWidth(15)
         self.labelStop.setText('🛑')
@@ -92,6 +99,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.statusbar.addPermanentWidget(self.labelState)
         self.statusbar.addPermanentWidget(self.labelTrigger)
         self.statusbar.addPermanentWidget(self.labelExposure)
+        self.statusbar.addPermanentWidget(self.labelCmode)
         self.statusbar.addPermanentWidget(self.labelStop)
 
     def init_menubar(self):
@@ -115,14 +123,18 @@ class LiveViewUi(QtWidgets.QMainWindow):
         trigger_mode_group.addAction(self.actionEXTS)
         trigger_mode_group.addAction(self.actionEXTE)
         trigger_mode_group.addAction(self.actionStop)
-        self.actionINTS.triggered.connect(self.update_trigger_mode)
+        trigger_mode_group.triggered.connect(self.update_trigger_mode)
         self.actionINTS.setShortcut('Ctrl+1')
-        self.actionEXTS.triggered.connect(self.update_trigger_mode)
         self.actionEXTS.setShortcut('Ctrl+2')
-        self.actionEXTE.triggered.connect(self.update_trigger_mode)
         self.actionEXTE.setShortcut('Ctrl+3')
-        self.actionStop.triggered.connect(self.update_trigger_mode)
         self.actionStop.setShortcut('Esc')
+
+        counting_mode_group = QtWidgets.QActionGroup(self)
+        counting_mode_group.addAction(self.actionCmodeNormal)
+        counting_mode_group.addAction(self.actionCmodeRetrigger)
+        counting_mode_group.triggered.connect(self.update_counting_mode)
+        self.actionCmodeNormal.setShortcut('Ctrl+4')
+        self.actionCmodeRetrigger.setShortcut('Ctrl+5')
 
     @QtCore.pyqtSlot(tuple)
     def update_label_intensity(self, xy):
@@ -139,12 +151,14 @@ class LiveViewUi(QtWidgets.QMainWindow):
             self.labelState.setText(f'Detector: {"":>7s} Monitor: {"":>7s}')
             self.labelTrigger.setText(f'Trigger: {"":>4s}')
             self.labelExposure.setText(f'Exposure: {"":>5s}  ')
+            self.labelCmode.setText(f'Counting: {"":>8s}')
         else:
             self.labelState.setText(f'Detector: {states["quadro"]:>7s} Monitor: {states["mon"]:>7s}')
             self.labelTrigger.setText(f'Trigger: {states["trigger_mode"]:>4s}')
             if states['trigger_mode'] == 'exts':
                 self.labelExposure.setText('Exposure:   trig ')
             self.labelExposure.setText(f'Exposure: {states["exposure"] * 1000:>5.0f}ms')
+            self.labelCmode.setText(f'Counting: {states["counting_mode"]:>8s}')
 
     @QtCore.pyqtSlot(np.ndarray)
     def update_image(self, image):
@@ -213,6 +227,14 @@ class LiveViewUi(QtWidgets.QMainWindow):
                 self.dectris_image_grabber.Q.trigger_mode = mode
             else:
                 log.warning(f'could not change trigger mode, detector disconnected')
+
+    @QtCore.pyqtSlot()
+    def update_counting_mode(self):
+        if self.dectris_image_grabber.connected:
+            if self.actionCmodeNormal.isChecked():
+                self.dectris_image_grabber.Q.counting_mode = 'normal'
+            else:
+                self.dectris_image_grabber.Q.counting_mode = 'retrigger'
 
     @interrupt_acquisition
     @QtCore.pyqtSlot()
