@@ -1,6 +1,9 @@
 from copy import copy, deepcopy
 import logging as log
+import weakref
 import pyqtgraph as pg
+from pyqtgraph.Qt import QtGui, QtWidgets
+from pyqtgraph.graphicsItems.ViewBox.ViewBoxMenu import ui_template
 import numpy as np
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
 
@@ -9,6 +12,7 @@ class ImageViewWidget(pg.ImageView):
     x_size = 0
     y_size = 0
     image = None
+    raw_image = None
     cursor_changed = pyqtSignal(tuple)
 
     def __init__(self, parent=None, cmap='inferno'):
@@ -22,6 +26,12 @@ class ImageViewWidget(pg.ImageView):
         self.ui.menuBtn.hide()
         self.view.invertY(True)
         self.view.setAspectLocked(1)
+
+        self.view.menu = ViewBoxMenu(self.view)
+        self.view.menu.autoLevels.triggered.connect(self.update_scale)
+        self.view.menu.linScale.triggered.connect(self.update_scale)
+        self.view.menu.logScale.triggered.connect(self.update_scale)
+        self.view.menu.sqrtScale.triggered.connect(self.update_scale)
 
         self.proxy = pg.SignalProxy(self.scene.sigMouseMoved,
                                     rateLimit=60, slot=self.__callback_move)
@@ -44,10 +54,14 @@ class ImageViewWidget(pg.ImageView):
         self.addItem(self.max_label)
 
     def setImage(self, *args, max_label=False, projections=False, **kwargs):
+        self.raw_image = copy(args[0])
         self.image = args[0]
         self.x_size, self.y_size = self.image.shape
 
-        # self.view.setLimits(xMin=-10, xMax=self.x_size+10, yMin=-10, yMax=self.y_size+10)
+        if self.view.menu.logScale.isChecked():
+            self.image = np.log(self.image, where=self.image > 0)
+        elif self.view.menu.sqrtScale.isChecked():
+            self.image = np.sqrt(self.image, where=self.image > 0)
 
         if max_label:
             self.max_label.setText(f'<span style="font-size: 32pt">{int(self.image.max())}</span>')
@@ -68,7 +82,21 @@ class ImageViewWidget(pg.ImageView):
             self.x_projection.clear()
             self.y_projection.clear()
 
-        super().setImage(*args, autoRange=False, **kwargs)
+        auto_levels = self.view.menu.autoLevels.isChecked()
+        super().setImage(self.image, *args[1:], autoLevels=auto_levels,
+                         autoHistogramRange=auto_levels, autoRange=False, **kwargs)
+
+    @pyqtSlot()
+    def update_scale(self, *args, **kwargs):
+        if self.raw_image is None:
+            return
+        if self.view.menu.logScale.isChecked():
+            self.raw_image = np.log(self.raw_image, where=self.raw_image > 0)
+        elif self.view.menu.sqrtScale.isChecked():
+            self.raw_image = np.sqrt(self.raw_image, where=self.raw_image > 0)
+        auto_levels = self.view.menu.autoLevels.isChecked()
+        super().setImage(self.raw_image, *args, autoLevels=auto_levels,
+                         autoHistogramRange=auto_levels, autoRange=False, **kwargs)
 
     @pyqtSlot(tuple)
     def __callback_move(self, evt):
@@ -123,6 +151,63 @@ class ImageViewWidget(pg.ImageView):
                         self.view.removeItem(i)
                     except ValueError:
                         pass
+
+
+class ViewBoxMenu(pg.graphicsItems.ViewBox.ViewBoxMenu.ViewBoxMenu):
+    """
+    this is derived from pg.graphicsItems.ViewBox.ViewBoxMenu.ViewBoxMenu in order to adapt the context menu
+    """
+    def __init__(self, view):
+        QtWidgets.QMenu.__init__(self)
+
+        self.view = weakref.ref(view)  # keep weakref to view to avoid circular reference
+        self.valid = False  # tells us whether the ui needs to be updated
+        self.viewMap = weakref.WeakValueDictionary()  # weakrefs to all views listed in the link combos
+
+        self.setTitle('ViewBox options')
+        self.viewAll = QtGui.QAction('View All', self)
+        self.viewAll.triggered.connect(self.autoRange)
+        self.addAction(self.viewAll)
+
+        self.autoLevels = QtGui.QAction('Auto Levels', self)
+        self.autoLevels.setCheckable(True)
+        self.autoLevels.setChecked(True)
+        self.addAction(self.autoLevels)
+
+        self.addSeparator()
+        g = QtWidgets.QActionGroup(self)
+        self.linScale = QtGui.QAction('Linear Scale')
+        self.linScale.setCheckable(True)
+        self.linScale.setChecked(True)
+        self.addAction(self.linScale)
+        g.addAction(self.linScale)
+        self.logScale = QtGui.QAction('Log Scale')
+        self.logScale.setCheckable(True)
+        self.addAction(self.logScale)
+        g.addAction(self.logScale)
+        self.sqrtScale = QtGui.QAction('Sqrt Scale')
+        self.sqrtScale.setCheckable(True)
+        self.addAction(self.sqrtScale)
+        g.addAction(self.sqrtScale)
+
+        # unused actions
+        self.axes = []
+        self.ctrl = []
+        self.widgetGroups = []
+        self.dv = QtGui.QDoubleValidator(self)
+        for _ in 'XY':
+            w = QtWidgets.QWidget()
+            ui = ui_template.Ui_Form()
+            ui.setupUi(w)
+            a = QtWidgets.QWidgetAction(self)
+            a.setDefaultWidget(w)
+            self.ctrl.append(ui)
+        self.leftMenu = QtWidgets.QMenu('Mouse Mode')
+        pan = QtGui.QAction('3 button', self.leftMenu)
+        zoom = QtGui.QAction('1 button', self.leftMenu)
+        self.mouseModes = [pan, zoom]
+        self.view().sigStateChanged.connect(self.viewStateChanged)
+        self.updateState()
 
 
 class ROIView(pg.GraphicsLayoutWidget):
