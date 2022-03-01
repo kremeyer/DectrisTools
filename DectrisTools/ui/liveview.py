@@ -104,7 +104,6 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.actionLinkYAxis.triggered.connect(self.update_y_axis_link)
         self.actionLinkYAxis.setShortcut('Y')
         self.actionShowProjections.setShortcut('P')
-        self.actionAutoLevels.setShortcut('L')
         self.actionShowCrosshair.setShortcut('C')
         self.actionShowCrosshair.triggered.connect(lambda x=self.actionShowCrosshair.isChecked(): self.viewer.show_crosshair(x))
         self.actionShowMaxPixelValue.setShortcut('M')
@@ -152,8 +151,6 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.image = image
         self.viewer.clear()
         self.viewer.setImage(image,
-                             autoHistogramRange=self.actionAutoLevels.isChecked(),
-                             autoLevels=self.actionAutoLevels.isChecked(),
                              max_label=self.actionShowMaxPixelValue.isChecked(),
                              projections=self.actionShowProjections.isChecked(),)
         self.i_digits = len(str(int(image.max(initial=1))))
