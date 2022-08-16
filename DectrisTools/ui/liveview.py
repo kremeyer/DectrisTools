@@ -29,6 +29,15 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.settings = QtCore.QSettings("Siwick Research Group", "DectrisTools Liveview", parent=self)
         if self.settings.value('main_window_geometry') is not None:
             self.setGeometry(self.settings.value('main_window_geometry'))
+        if self.settings.value('auto_levels') is not None:
+            auto_levels = self.settings.value('auto_levels').lower() == 'true'
+            self.viewer.view.menu.autoLevels.setChecked(auto_levels)
+            if not auto_levels:
+                if self.settings.value('image_levels') is not None:
+                    self.viewer.setLevels(*self.settings.value('image_levels'))
+                    self.viewer.setHistogramRange(*self.settings.value('image_levels'))
+                if self.settings.value('histogram_range') is not None:
+                    self.viewer.ui.histogram.setHistogramRange(*self.settings.value('histogram_range'), padding=0)
 
         self.update_interval = cmd_args.update_interval
 
@@ -80,8 +89,11 @@ class LiveViewUi(QtWidgets.QMainWindow):
         for i in self.viewer.view.addedItems:
             if isinstance(i, RectROI):
                 i.win.hide()
-        print(self.geometry())
         self.settings.setValue('main_window_geometry', self.geometry())
+        self.settings.setValue('image_levels', self.viewer.getLevels())
+        self.settings.setValue('auto_levels', self.viewer.view.menu.autoLevels.isChecked())
+        hist_range = tuple(self.viewer.ui.histogram.item.vb.viewRange()[1])  # wtf?
+        self.settings.setValue('histogram_range', hist_range)
         self.hide()
         self.image_timer.stop()
         self.status_timer.stop()
