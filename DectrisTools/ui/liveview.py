@@ -4,7 +4,7 @@ import numpy as np
 from PyQt5 import QtWidgets, QtCore, QtGui, uic
 import pyqtgraph as pg
 from .. import get_base_path
-from ..lib.Utils import DectrisImageGrabber, DectrisStatusGrabber, ConstantPing, interrupt_acquisition, RectROI
+from ..lib.uiutils import DectrisImageGrabber, DectrisStatusGrabber, ConstantPing, interrupt_acquisition, RectROI
 from .widgets import ROIView
 from ..ui.captured import CapturedUi
 
