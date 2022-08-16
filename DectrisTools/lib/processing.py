@@ -127,9 +127,9 @@ class SingleShotProcessor(ThreadPoolExecutor):
                 sum_2 = np.sum(images[1::2])
             if sum_1 > sum_2:
                 data_mean = np.mean(images[::2], axis=0)
-                data_intensities = np.sum(images[::2], axis=(1, 2))
+                data_intensities = np.array([np.sum(img*self.mask) for img in images[::2]])  # using list to save memory
                 dark_mean = np.mean(images[1::2], axis=0)
-                dark_intensities = np.sum(images[1::2], axis=(1, 2))
+                dark_intensities = np.array([np.sum(img*self.mask) for img in images[1::2]])  # using list to save memory
                 if sum_1 / np.max((sum_2, 1e-10)) < 100:
                     warnings.warn(
                         "low confidence in distnguishing pump on/off data",
@@ -137,9 +137,9 @@ class SingleShotProcessor(ThreadPoolExecutor):
                     )
             else:
                 data_mean = np.mean(images[1::2], axis=0)
-                data_intensities = np.sum(images[1::2]*self.mask, axis=(1, 2))
+                data_intensities = np.array([np.sum(img*self.mask) for img in images[1::2]])  # using list to save memory
                 dark_mean = np.mean(images[::2], axis=0)
-                dark_intensities = np.sum(images[::2]*self.mask, axis=(1, 2))
+                dark_intensities = np.array([np.sum(img*self.mask) for img in images[::2]])  # using list to save memory
                 if sum_2 / np.max((sum_2, 1e-10)) < 100:
                     warnings.warn(
                         "low confidence in distnguishing pump on/off data",
@@ -179,9 +179,9 @@ class SingleShotProcessor(ThreadPoolExecutor):
                     warnings.warn("low confidence in distnguishing pump on/off data")
         difference_mean = np.mean(pump_on - pump_off, axis=0)
         pump_on_mean = np.mean(pump_on, axis=0)
-        pump_on_intensities = np.sum(pump_on*self.mask, axis=(1, 2))
+        pump_on_intensities = np.array([np.sum(img*self.mask) for img in pump_on])  # using list to save memory
         pump_off_mean = np.mean(pump_off, axis=0)
-        pump_off_intensities = np.sum(pump_off*self.mask, axis=(1, 2))
+        pump_off_intensities = np.array([np.sum(img*self.mask) for img in pump_off])  # using list to save memory
 
         with h5py.File(dest, "w") as f:
             f.create_dataset("pump_on", data=pump_on_mean, **hdf5plugin.Bitshuffle())
