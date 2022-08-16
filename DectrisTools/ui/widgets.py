@@ -15,8 +15,8 @@ class ImageViewWidget(pg.ImageView):
     raw_image = None
     cursor_changed = pyqtSignal(tuple)
 
-    def __init__(self, parent=None, cmap='inferno'):
-        log.debug('initializing ImageViewWidget')
+    def __init__(self, parent=None, cmap="inferno"):
+        log.debug("initializing ImageViewWidget")
         super().__init__()
         self.setParent(parent)
         self.setPredefinedGradient(cmap)
@@ -33,15 +33,21 @@ class ImageViewWidget(pg.ImageView):
         self.view.menu.logScale.triggered.connect(self.update_scale)
         self.view.menu.sqrtScale.triggered.connect(self.update_scale)
 
-        self.proxy = pg.SignalProxy(self.scene.sigMouseMoved,
-                                    rateLimit=60, slot=self.__callback_move)
+        self.proxy = pg.SignalProxy(
+            self.scene.sigMouseMoved, rateLimit=60, slot=self.__callback_move
+        )
 
-        self.max_label = pg.LabelItem(justify='right')
+        self.max_label = pg.LabelItem(justify="right")
         self.frame_top = pg.InfiniteLine(angle=0, movable=False)
         self.frame_bottom = pg.InfiniteLine(angle=0, movable=False)
         self.frame_left = pg.InfiniteLine(angle=90, movable=False)
         self.frame_right = pg.InfiniteLine(angle=90, movable=False)
-        self.frames = [self.frame_top, self.frame_bottom, self.frame_left, self.frame_right]
+        self.frames = [
+            self.frame_top,
+            self.frame_bottom,
+            self.frame_left,
+            self.frame_right,
+        ]
 
         self.crosshair_h = pg.InfiniteLine(angle=45, movable=False)
         self.crosshair_v = pg.InfiniteLine(angle=135, movable=False)
@@ -64,27 +70,41 @@ class ImageViewWidget(pg.ImageView):
             self.image = np.sqrt(self.image, where=self.image > 0)
 
         if max_label:
-            self.max_label.setText(f'<span style="font-size: 32pt">{int(self.image.max())}</span>')
+            self.max_label.setText(
+                f'<span style="font-size: 32pt">{int(self.image.max())}</span>'
+            )
         else:
-            self.max_label.setText('')
+            self.max_label.setText("")
 
         if projections:
             x_projection_data = np.mean(self.image, axis=0)
             x_projection_data /= np.mean(x_projection_data)
             x_projection_data *= self.image.shape[1] * 0.1
-            self.x_projection.setData(x=x_projection_data, y=np.arange(0, self.image.shape[1]) + 0.5)
+            self.x_projection.setData(
+                x=x_projection_data, y=np.arange(0, self.image.shape[1]) + 0.5
+            )
 
             y_projection_data = np.mean(self.image, axis=1)
             y_projection_data /= np.max(y_projection_data)
-            y_projection_data *= self.image.shape[0] * 0.1  # make plot span 10% of the image
-            self.y_projection.setData(x=np.arange(0, self.image.shape[0]) + 0.5, y=y_projection_data)
+            y_projection_data *= (
+                self.image.shape[0] * 0.1
+            )  # make plot span 10% of the image
+            self.y_projection.setData(
+                x=np.arange(0, self.image.shape[0]) + 0.5, y=y_projection_data
+            )
         else:
             self.x_projection.clear()
             self.y_projection.clear()
 
         auto_levels = self.view.menu.autoLevels.isChecked()
-        super().setImage(self.image, *args[1:], autoLevels=auto_levels,
-                         autoHistogramRange=auto_levels, autoRange=False, **kwargs)
+        super().setImage(
+            self.image,
+            *args[1:],
+            autoLevels=auto_levels,
+            autoHistogramRange=auto_levels,
+            autoRange=False,
+            **kwargs,
+        )
 
     @pyqtSlot()
     def update_scale(self, *args, **kwargs):
@@ -95,8 +115,14 @@ class ImageViewWidget(pg.ImageView):
         elif self.view.menu.sqrtScale.isChecked():
             self.raw_image = np.sqrt(self.raw_image, where=self.raw_image > 0)
         auto_levels = self.view.menu.autoLevels.isChecked()
-        super().setImage(self.raw_image, *args, autoLevels=auto_levels,
-                         autoHistogramRange=auto_levels, autoRange=False, **kwargs)
+        super().setImage(
+            self.raw_image,
+            *args,
+            autoLevels=auto_levels,
+            autoHistogramRange=auto_levels,
+            autoRange=False,
+            **kwargs,
+        )
 
     @pyqtSlot(tuple)
     def __callback_move(self, evt):
@@ -137,9 +163,9 @@ class ImageViewWidget(pg.ImageView):
     @pyqtSlot(bool)
     def show_crosshair(self, state):
         if state:
-            self.crosshair_h.setPos((self.x_size/2, self.y_size/2))
+            self.crosshair_h.setPos((self.x_size / 2, self.y_size / 2))
             self.addItem(self.crosshair_h)
-            self.crosshair_v.setPos((self.x_size/2, self.y_size/2))
+            self.crosshair_v.setPos((self.x_size / 2, self.y_size / 2))
             self.addItem(self.crosshair_v)
             return
         items_in_view = copy(self.view.addedItems)
@@ -157,35 +183,40 @@ class ViewBoxMenu(pg.graphicsItems.ViewBox.ViewBoxMenu.ViewBoxMenu):
     """
     this is derived from pg.graphicsItems.ViewBox.ViewBoxMenu.ViewBoxMenu in order to adapt the context menu
     """
+
     def __init__(self, view):
         QtWidgets.QMenu.__init__(self)
 
-        self.view = weakref.ref(view)  # keep weakref to view to avoid circular reference
+        self.view = weakref.ref(
+            view
+        )  # keep weakref to view to avoid circular reference
         self.valid = False  # tells us whether the ui needs to be updated
-        self.viewMap = weakref.WeakValueDictionary()  # weakrefs to all views listed in the link combos
+        self.viewMap = (
+            weakref.WeakValueDictionary()
+        )  # weakrefs to all views listed in the link combos
 
-        self.setTitle('ViewBox options')
-        self.viewAll = QtGui.QAction('View All', self)
+        self.setTitle("ViewBox options")
+        self.viewAll = QtGui.QAction("View All", self)
         self.viewAll.triggered.connect(self.autoRange)
         self.addAction(self.viewAll)
 
-        self.autoLevels = QtGui.QAction('Auto Levels', self)
+        self.autoLevels = QtGui.QAction("Auto Levels", self)
         self.autoLevels.setCheckable(True)
         self.autoLevels.setChecked(True)
         self.addAction(self.autoLevels)
 
         self.addSeparator()
         g = QtWidgets.QActionGroup(self)
-        self.linScale = QtGui.QAction('Linear Scale')
+        self.linScale = QtGui.QAction("Linear Scale")
         self.linScale.setCheckable(True)
         self.linScale.setChecked(True)
         self.addAction(self.linScale)
         g.addAction(self.linScale)
-        self.logScale = QtGui.QAction('Log Scale')
+        self.logScale = QtGui.QAction("Log Scale")
         self.logScale.setCheckable(True)
         self.addAction(self.logScale)
         g.addAction(self.logScale)
-        self.sqrtScale = QtGui.QAction('Sqrt Scale')
+        self.sqrtScale = QtGui.QAction("Sqrt Scale")
         self.sqrtScale.setCheckable(True)
         self.addAction(self.sqrtScale)
         g.addAction(self.sqrtScale)
@@ -195,26 +226,25 @@ class ViewBoxMenu(pg.graphicsItems.ViewBox.ViewBoxMenu.ViewBoxMenu):
         self.ctrl = []
         self.widgetGroups = []
         self.dv = QtGui.QDoubleValidator(self)
-        for _ in 'XY':
+        for _ in "XY":
             w = QtWidgets.QWidget()
             ui = ui_template.Ui_Form()
             ui.setupUi(w)
             a = QtWidgets.QWidgetAction(self)
             a.setDefaultWidget(w)
             self.ctrl.append(ui)
-        self.leftMenu = QtWidgets.QMenu('Mouse Mode')
-        pan = QtGui.QAction('3 button', self.leftMenu)
-        zoom = QtGui.QAction('1 button', self.leftMenu)
+        self.leftMenu = QtWidgets.QMenu("Mouse Mode")
+        pan = QtGui.QAction("3 button", self.leftMenu)
+        zoom = QtGui.QAction("1 button", self.leftMenu)
         self.mouseModes = [pan, zoom]
         self.view().sigStateChanged.connect(self.viewStateChanged)
         self.updateState()
 
 
 class ROIView(pg.GraphicsLayoutWidget):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.setBackground('k')
+        self.setBackground("k")
 
     def __len__(self):
         return len(self.ci.items)
@@ -227,9 +257,9 @@ class ROIView(pg.GraphicsLayoutWidget):
             return list(copy(self.ci.items).keys())
 
     def rearrange(self):
-        log.info('rearranging ROIView layout')
+        log.info("rearranging ROIView layout")
         rows = round(np.sqrt(len(self)))
-        cols = int(np.ceil(len(self)/rows))
+        cols = int(np.ceil(len(self) / rows))
         plots = self.plots
         self.clear()
         i = 0
@@ -240,7 +270,7 @@ class ROIView(pg.GraphicsLayoutWidget):
                     i += 1
 
     def set_link_y_axis(self, state):
-        log.info(f'setting link y axis to {state}')
+        log.info(f"setting link y axis to {state}")
         if state:
             for p in self.plots[1:]:
                 p.setYLink(self.plots[0])
