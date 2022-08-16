@@ -130,7 +130,7 @@ class SingleShotProcessor(ThreadPoolExecutor):
                 data_intensities = np.sum(images[::2], axis=(1, 2))
                 dark_mean = np.mean(images[1::2], axis=0)
                 dark_intensities = np.sum(images[1::2], axis=(1, 2))
-                if sum_1 / sum_2 < 100:
+                if sum_1 / np.max((sum_2, 1e-10)) < 100:
                     warnings.warn(
                         "low confidence in distnguishing pump on/off data",
                         UndistinguishableWarning,
@@ -140,7 +140,7 @@ class SingleShotProcessor(ThreadPoolExecutor):
                 data_intensities = np.sum(images[1::2]*self.mask, axis=(1, 2))
                 dark_mean = np.mean(images[::2], axis=0)
                 dark_intensities = np.sum(images[::2]*self.mask, axis=(1, 2))
-                if sum_2 / sum_1 < 100:
+                if sum_2 / np.max((sum_2, 1e-10)) < 100:
                     warnings.warn(
                         "low confidence in distnguishing pump on/off data",
                         UndistinguishableWarning,
