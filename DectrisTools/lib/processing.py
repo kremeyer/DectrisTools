@@ -41,7 +41,7 @@ class SingleShotProcessor(ThreadPoolExecutor):
 
     BORDERSIZE = 5
 
-    def __init__(self, filelist, max_workers=None):
+    def __init__(self, filelist, mask=None, max_workers=None):
         self.filelist = filelist
         self.sample_dataset = h5py.File(filelist[0], "r")["entry/data/data"]
         if max_workers is None:
@@ -63,6 +63,10 @@ class SingleShotProcessor(ThreadPoolExecutor):
                     datasets_in_memory = 1
                 max_workers = datasets_in_memory
         self.img_size = self.sample_dataset.shape[1:]
+        if mask is None:
+            self.mask = np.ones(self.img_size)
+        else:
+            self.mask = mask
         self.n_imgs = self.sample_dataset.shape[0]
         self.border_mask = np.ones(self.img_size).astype("bool")
         self.border_mask[
@@ -123,7 +127,9 @@ class SingleShotProcessor(ThreadPoolExecutor):
                 sum_2 = np.sum(images[1::2])
             if sum_1 > sum_2:
                 data_mean = np.mean(images[::2], axis=0)
+                data_intensities = np.sum(images[::2], axis=(1, 2))
                 dark_mean = np.mean(images[1::2], axis=0)
+                dark_intensities = np.sum(images[1::2], axis=(1, 2))
                 if sum_1 / sum_2 < 100:
                     warnings.warn(
                         "low confidence in distnguishing pump on/off data",
@@ -131,7 +137,9 @@ class SingleShotProcessor(ThreadPoolExecutor):
                     )
             else:
                 data_mean = np.mean(images[1::2], axis=0)
+                data_intensities = np.sum(images[1::2]*self.mask, axis=(1, 2))
                 dark_mean = np.mean(images[::2], axis=0)
+                dark_intensities = np.sum(images[::2]*self.mask, axis=(1, 2))
                 if sum_2 / sum_1 < 100:
                     warnings.warn(
                         "low confidence in distnguishing pump on/off data",
@@ -140,7 +148,9 @@ class SingleShotProcessor(ThreadPoolExecutor):
 
         with h5py.File(dest, "w") as f:
             f.create_dataset(name, data=data_mean)
-            f.create_dataset("dark", data=dark_mean)
+            f.create_dataset('dark', data=dark_mean)
+            f.create_dataset(f'{name}_sum_intensities', data=data_intensities)
+            f.create_dataset("dark_sum_intensities", data=dark_intensities)
 
     def __process_pump_probe(self, src, dest):
         with h5py.File(src, "r") as f:
@@ -169,11 +179,15 @@ class SingleShotProcessor(ThreadPoolExecutor):
                     warnings.warn("low confidence in distnguishing pump on/off data")
         difference_mean = np.mean(pump_on - pump_off, axis=0)
         pump_on_mean = np.mean(pump_on, axis=0)
+        pump_on_intensities = np.sum(pump_on*self.mask, axis=(1, 2))
         pump_off_mean = np.mean(pump_off, axis=0)
+        pump_off_intensities = np.sum(pump_off*self.mask, axis=(1, 2))
 
         with h5py.File(dest, "w") as f:
             f.create_dataset("pump_on", data=pump_on_mean, **hdf5plugin.Bitshuffle())
+            f.create_dataset("pump_on_sum_intensities", data=pump_on_intensities, **hdf5plugin.Bitshuffle())
             f.create_dataset("pump_off", data=pump_off_mean, **hdf5plugin.Bitshuffle())
+            f.create_dataset("pump_off_sum_intensities", data=pump_off_intensities, **hdf5plugin.Bitshuffle())
             f.create_dataset(
                 "difference", data=difference_mean, **hdf5plugin.Bitshuffle()
             )
