@@ -28,6 +28,10 @@ class LiveViewUi(QtWidgets.QMainWindow):
         log.debug("initializing DectrisLiveView")
         super().__init__(*args, **kwargs)
         uic.loadUi(path.join(get_base_path(), "ui/liveview.ui"), self)
+        self.settings = QtCore.QSettings("Siwick Research Group", "DectrisTools Liveview", parent=self)
+        if self.settings.value('main_window_geometry') is not None:
+            self.setGeometry(self.settings.value('main_window_geometry'))
+
         self.update_interval = cmd_args.update_interval
 
         self.dectris_image_grabber = DectrisImageGrabber(
@@ -88,6 +92,8 @@ class LiveViewUi(QtWidgets.QMainWindow):
         for i in self.viewer.view.addedItems:
             if isinstance(i, RectROI):
                 i.win.hide()
+        print(self.geometry())
+        self.settings.setValue('main_window_geometry', self.geometry())
         self.hide()
         self.image_timer.stop()
         self.status_timer.stop()
