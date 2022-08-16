@@ -156,31 +156,6 @@ class DectrisStatusGrabber(QObject):
         log.debug(f'quit status_grabber_thread {self.status_grabber_thread.currentThread()}')
 
 
-class ConstantPing(QObject):
-    """
-    emitting signals at a constant frequency until interrupted
-    """
-    advance_progress_bar = pyqtSignal()
-
-    def __init__(self, period=0.01):
-        super().__init__()
-
-        self.period = period
-
-        self.progress_thread = QThread()
-        self.moveToThread(self.progress_thread)
-        self.progress_thread.started.connect(self.__start_progress)
-
-    @pyqtSlot()
-    def __start_progress(self):
-        while True:
-            if self.progress_thread.isInterruptionRequested():
-                self.progress_thread.quit()
-                return
-            self.advance_progress_bar.emit()
-            sleep(self.period)
-
-
 def interrupt_acquisition(f):
     """
     decorator interrupting/resuming image acquisition before/after function call
