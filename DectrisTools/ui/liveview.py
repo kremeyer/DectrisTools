@@ -7,12 +7,10 @@ from .. import get_base_path
 from ..lib.uiutils import (
     DectrisImageGrabber,
     DectrisStatusGrabber,
-    ConstantPing,
     interrupt_acquisition,
     RectROI,
 )
 from .widgets import ROIView
-from ..ui.captured import CapturedUi
 
 
 class LiveViewUi(QtWidgets.QMainWindow):
@@ -28,6 +26,19 @@ class LiveViewUi(QtWidgets.QMainWindow):
         log.debug("initializing DectrisLiveView")
         super().__init__(*args, **kwargs)
         uic.loadUi(path.join(get_base_path(), "ui/liveview.ui"), self)
+        self.settings = QtCore.QSettings("Siwick Research Group", "DectrisTools Liveview", parent=self)
+        if self.settings.value('main_window_geometry') is not None:
+            self.setGeometry(self.settings.value('main_window_geometry'))
+        if self.settings.value('auto_levels') is not None:
+            auto_levels = self.settings.value('auto_levels').lower() == 'true'
+            self.viewer.view.menu.autoLevels.setChecked(auto_levels)
+            if not auto_levels:
+                if self.settings.value('image_levels') is not None:
+                    self.viewer.setLevels(*self.settings.value('image_levels'))
+                    self.viewer.setHistogramRange(*self.settings.value('image_levels'))
+                if self.settings.value('histogram_range') is not None:
+                    self.viewer.ui.histogram.setHistogramRange(*self.settings.value('histogram_range'), padding=0)
+
         self.update_interval = cmd_args.update_interval
 
         self.dectris_image_grabber = DectrisImageGrabber(
@@ -42,10 +53,6 @@ class LiveViewUi(QtWidgets.QMainWindow):
             elif self.dectris_image_grabber.Q.counting_mode == "retrigger":
                 self.actionCmodeRetrigger.setChecked(True)
         self.dectris_status_grabber = DectrisStatusGrabber(cmd_args.ip, cmd_args.port)
-        self.exposure_progress_worker = ConstantPing()
-        self.dectris_image_grabber.exposure_triggered.connect(
-            self.exposure_progress_worker.progress_thread.start
-        )
 
         self.image_timer = QtCore.QTimer()
         self.image_timer.timeout.connect(
@@ -59,12 +66,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         )
         self.dectris_status_grabber.status_ready.connect(self.update_status_labels)
 
-        self.exposure_progress_worker.advance_progress_bar.connect(
-            self.advance_progress_bar
-        )
-
         self.lineEditExposure.returnPressed.connect(self.update_exposure)
-        self.lineEditCapture.returnPressed.connect(self.capture_image)
 
         self.labelIntensity = QtWidgets.QLabel()
         self.labelState = QtWidgets.QLabel()
@@ -75,7 +77,6 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
         self.init_menubar()
         self.init_statusbar()
-        self.reset_progress_bar()
 
         self.status_timer.start(200)
 
@@ -88,12 +89,15 @@ class LiveViewUi(QtWidgets.QMainWindow):
         for i in self.viewer.view.addedItems:
             if isinstance(i, RectROI):
                 i.win.hide()
+        self.settings.setValue('main_window_geometry', self.geometry())
+        self.settings.setValue('image_levels', self.viewer.getLevels())
+        self.settings.setValue('auto_levels', self.viewer.view.menu.autoLevels.isChecked())
+        hist_range = tuple(self.viewer.ui.histogram.item.vb.viewRange()[1])  # wtf?
+        self.settings.setValue('histogram_range', hist_range)
         self.hide()
         self.image_timer.stop()
         self.status_timer.stop()
         self.dectris_image_grabber.image_grabber_thread.requestInterruption()
-        self.exposure_progress_worker.progress_thread.requestInterruption()
-        self.exposure_progress_worker.progress_thread.wait()
         self.dectris_status_grabber.status_grabber_thread.wait()
         self.dectris_image_grabber.image_grabber_thread.wait()
         super().closeEvent(evt)
@@ -197,9 +201,6 @@ class LiveViewUi(QtWidgets.QMainWindow):
         )
         self.i_digits = len(str(int(image.max(initial=1))))
         self.update_all_rois()
-        self.exposure_progress_worker.progress_thread.requestInterruption()
-        self.exposure_progress_worker.progress_thread.wait()
-        self.reset_progress_bar()
 
     @interrupt_acquisition
     @QtCore.pyqtSlot()
@@ -223,22 +224,12 @@ class LiveViewUi(QtWidgets.QMainWindow):
                 self.dectris_image_grabber.image_ready.connect(self.show_captured_image)
                 self.dectris_image_grabber.image_grabber_thread.start()
 
-    @QtCore.pyqtSlot(np.ndarray)
-    def show_captured_image(self, image):
-        log.info("showing captured image")
-        self.dectris_image_grabber.image_ready.disconnect(self.show_captured_image)
-        self.dectris_image_grabber.image_ready.connect(self.update_image)
-        CapturedUi(image, parent=self)
-        self.update_exposure()
-        self.update_trigger_mode()
-
     @interrupt_acquisition
     @QtCore.pyqtSlot()
     def update_trigger_mode(self):
         if self.actionStop.isChecked():
             self.labelStop.setText("🛑")
             self.image_timer.stop()
-            self.progressBarExposure.setValue(self.progressBarExposure.minimum())
         else:
             self.labelStop.setText("")
             if not self.image_timer.isActive():
@@ -283,24 +274,6 @@ class LiveViewUi(QtWidgets.QMainWindow):
             self.dectris_image_grabber.Q.frame_time = time
         else:
             log.warning(f"could not change exposure time, detector disconnected")
-
-    @QtCore.pyqtSlot()
-    def advance_progress_bar(self):
-        if self.progressBarExposure.value() + 1 < self.progressBarExposure.maximum():
-            self.progressBarExposure.setValue(self.progressBarExposure.value() + 1)
-        else:
-            self.progressBarExposure.setValue(self.progressBarExposure.maximum())
-
-    def reset_progress_bar(self):
-        if self.dectris_image_grabber.connected:
-            time = self.progressBarExposure.setMaximum(
-                int(self.dectris_image_grabber.Q.frame_time * 100)
-            )
-        else:
-            time = 100
-        self.progressBarExposure.setValue(0)
-        if time is not None:
-            self.progressBarExposure.setMaximum(time)
 
     @QtCore.pyqtSlot()
     def start_acquisition(self):
