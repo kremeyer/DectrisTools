@@ -6,7 +6,7 @@ from tqdm import tqdm
 from .lib.processing import SingleShotProcessor
 import sys
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     rundir = sys.argv[1]
     try:
         max_workers = sys.argv[2]
