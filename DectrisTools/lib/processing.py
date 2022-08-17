@@ -4,11 +4,18 @@ module for data processing tools
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Thread
 import warnings
-from os import path
+from os import path, listdir
+from pathlib import Path
+import re
+from datetime import datetime
 from psutil import virtual_memory
 import numpy as np
 import hdf5plugin
 import h5py
+
+
+def delay_from_fname(fname):
+    return float(fname.split(r"/")[-1][7:17])
 
 
 class AlreadyProcessedWarning(Warning):
@@ -102,7 +109,7 @@ class SingleShotProcessor(ThreadPoolExecutor):
     def __worker(self, filename):
         dirname = path.dirname(filename)
         processed_filename = (
-            f'{path.join(dirname, filename.split(".")[0])}_processed.h5'
+            f'{path.join(dirname, Path(filename).stem)}_processed.h5'
         )
         if path.exists(processed_filename):
             raise OSError(f"{processed_filename} already exists")
@@ -169,14 +176,14 @@ class SingleShotProcessor(ThreadPoolExecutor):
                 pump_off = images[1::2]
                 if border_1 / border_2 < 100:
                     warnings.warn(
-                        "low confidence in distnguishing pump on/off data",
+                        f"low confidence in distnguishing pump on/off data: frac={border_1 / border_2}",
                         UndistinguishableWarning,
                     )
             else:
                 pump_on = images[1::2]
                 pump_off = images[::2]
                 if border_2 / border_1 < 100:
-                    warnings.warn("low confidence in distnguishing pump on/off data")
+                    warnings.warn(f"low confidence in distnguishing pump on/off data: frac={border_1 / border_2}")
         difference_mean = np.mean(pump_on - pump_off, axis=0)
         pump_on_mean = np.mean(pump_on, axis=0)
         pump_on_intensities = np.array([np.sum(img*self.mask) for img in pump_on])  # using list to save memory
@@ -191,3 +198,62 @@ class SingleShotProcessor(ThreadPoolExecutor):
             f.create_dataset(
                 "difference", data=difference_mean, **hdf5plugin.Bitshuffle()
             )
+
+
+class SingleShotDataset:
+    """class to load a single shot experiment processed with `SingleShotProcessor`
+    """
+    log_timestamp_pattern = re.compile(r"\d*-\d*-\d* \d*:\d*:\d*")
+    log_delay_pattern = re.compile(r"time-delay -?\d*.?\d*ps")
+    log_scan_pattern = re.compile(r"scan \d*")
+
+    def __init__(self, basedir):
+        self.basedir = basedir
+        h5_paths = []
+        for entry in listdir(self.basedir):
+            if entry.startswith("scan_"):
+                for image in listdir(path.join(self.basedir, entry)):
+                    h5_paths.append(path.join(self.basedir, entry, image))
+        h5_paths = sorted(h5_paths)
+
+        self.delays = np.array(
+            sorted(set([delay_from_fname(fname) for fname in h5_paths]))
+        )
+
+        realtime_idxs = {}
+        self.timestamps = []
+        self.diagnostic_timestamps = []
+        with open(path.join(basedir, "experiment.log")) as f:
+            i = 0
+            for line in f:
+                if "pump on image series acquired at scan " in line:
+                    scan = int(self.log_scan_pattern.findall(line)[0][5:])
+                    delay = float(
+                        self.log_delay_pattern.findall(line)[0][11:-2]
+                    )
+                    realtime_idxs[
+                        path.join(
+                            self.basedir,
+                            f"scan_{scan:04d}",
+                            f"pumpon_{delay:+010.3f}ps.tif",
+                        )
+                    ] = i
+                    i += 1
+                    timestamp = self.log_timestamp_pattern.findall(line)[0]
+                    self.timestamps.append(
+                        self.__str_to_datetime(timestamp)
+                    )
+                if "Diagnostic routine started." in line:
+                    timestamp = self.log_timestamp_pattern.findall(line)[0]
+                    self.diagnostic_timestamps.append(
+                        self.__str_to_datetime(timestamp)
+                    )
+        self.timedeltas = [ts-self.timestamps[0] for ts in self.timestamps]
+
+    @staticmethod
+    def __str_to_datetime(s):
+        return datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
+
+
+if __name__ == '__main__':
+    SingleShotDataset('/data/TiSe2_run_0010')
