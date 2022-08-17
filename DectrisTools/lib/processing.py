@@ -51,21 +51,20 @@ class SingleShotProcessor(ThreadPoolExecutor):
         if max_workers is None:
             # determine max workers from free memory and size of dataset
             free_memory = virtual_memory().available
-            with h5py.File(filelist[0], "r") as f:
-                datasets_in_memory = int(
-                    free_memory
-                    / (
-                        self.sample_dataset.dtype.itemsize
-                        * np.prod(self.sample_dataset.shape)
-                    )
+            datasets_in_memory = int(
+                free_memory
+                / (
+                    self.sample_dataset.dtype.itemsize
+                    * np.prod(self.sample_dataset.shape)
                 )
-                if datasets_in_memory == 0:
-                    warnings.warn(
-                        "you might want to free up some system memory; you can fit a whole dataset into it",
-                        ResourceWarning,
-                    )
-                    datasets_in_memory = 1
-                max_workers = datasets_in_memory
+            )
+            if datasets_in_memory == 0:
+                warnings.warn(
+                    "you might want to free up some system memory; you can fit a whole dataset into it",
+                    ResourceWarning,
+                )
+                datasets_in_memory = 1
+            max_workers = datasets_in_memory
         self.img_size = self.sample_dataset.shape[1:]
         if mask is None:
             self.mask = np.ones(self.img_size)
@@ -173,15 +172,18 @@ class SingleShotProcessor(ThreadPoolExecutor):
                 pump_off = images[1::2]
                 if border_1 / border_2 < 100:
                     warnings.warn(
-                        f"low confidence in distnguishing pump on/off data: frac={border_1 / border_2}",
+                        f"low confidence in distnguishing pump on/off: {src} frac={border_1 / border_2}",
                         UndistinguishableWarning,
                     )
             else:
                 pump_on = images[1::2]
                 pump_off = images[::2]
                 if border_2 / border_1 < 100:
-                    warnings.warn(f"low confidence in distnguishing pump on/off data: frac={border_1 / border_2}")
-        difference_mean = np.mean(pump_on - pump_off, axis=0)
+                    warnings.warn(f"low confidence in distnguishing pump on/off: {src} frac={border_1 / border_2}")
+        difference_mean = np.zeros((512, 512), dtype='float')
+        for on, off in zip(pump_on, pump_off):
+            difference_mean += (on.astype('float') - off.astype('float'))
+        difference_mean /= self.n_imgs
         pump_on_mean = np.mean(pump_on, axis=0)
         pump_on_intensities = np.array([np.sum(img*self.mask) for img in pump_on])  # using list to save memory
         pump_off_mean = np.mean(pump_off, axis=0)
@@ -204,7 +206,7 @@ class SingleShotDataset:
     log_delay_pattern = re.compile(r"time-delay -?\d*.?\d*ps")
     log_scan_pattern = re.compile(r"scan \d*")
 
-    def __init__(self, basedir, mask=None, normalize=None, progress=False, correct_dark=True, correct_laser=True):
+    def __init__(self, basedir, mask=None, normalize=False, progress=False, correct_dark=True, correct_laser=True):
         self.basedir = basedir
 
         h5_paths = []
