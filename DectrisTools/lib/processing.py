@@ -321,7 +321,3 @@ class SingleShotDataset:
     @staticmethod
     def __delay_from_fname(fname):
         return float(fname.split(r"/")[-1][7:17])
-
-
-if __name__ == '__main__':
-    SingleShotDataset('/data/TiSe2_run_0010', progress=True)
