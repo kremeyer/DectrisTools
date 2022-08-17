@@ -12,10 +12,7 @@ from psutil import virtual_memory
 import numpy as np
 import hdf5plugin
 import h5py
-
-
-def delay_from_fname(fname):
-    return float(fname.split(r"/")[-1][7:17])
+from tqdm import tqdm
 
 
 class AlreadyProcessedWarning(Warning):
@@ -207,17 +204,35 @@ class SingleShotDataset:
     log_delay_pattern = re.compile(r"time-delay -?\d*.?\d*ps")
     log_scan_pattern = re.compile(r"scan \d*")
 
-    def __init__(self, basedir):
+    def __init__(self, basedir, mask=None, normalize=None, progress=False, correct_dark=True, correct_laser=True):
         self.basedir = basedir
+
         h5_paths = []
         for entry in listdir(self.basedir):
             if entry.startswith("scan_"):
-                for image in listdir(path.join(self.basedir, entry)):
-                    h5_paths.append(path.join(self.basedir, entry, image))
+                for file in listdir(path.join(self.basedir, entry)):
+                    if file.endswith('_processed.h5'):
+                        h5_paths.append(path.join(self.basedir, entry, file))
         h5_paths = sorted(h5_paths)
 
+        # detect image shape and image count per file
+        with h5py.File(h5_paths[0], 'r') as f:
+            self.img_shape = f['pump_on'].shape
+            self.imgs_per_file = f['pump_on_sum_intensities'].shape[0]
+
+        self.dark = self.__load_diagnostic('dark', ['laser_background', 'pump_off'])
+        self.laser_only = self.__load_diagnostic('laser_bg', 'laser_background')
+        self.pump_off = self.__load_diagnostic('pump_off', 'pump_off')
+        self.all_imgs = []
+        self.all_diffimgs = []
+
+        if mask is None:
+            self.mask = np.ones(self.img_shape).astype("int")
+        else:
+            self.mask = mask.astype("int")
+
         self.delays = np.array(
-            sorted(set([delay_from_fname(fname) for fname in h5_paths]))
+            sorted(set([self.__delay_from_fname(fname) for fname in h5_paths]))
         )
 
         realtime_idxs = {}
@@ -235,7 +250,7 @@ class SingleShotDataset:
                         path.join(
                             self.basedir,
                             f"scan_{scan:04d}",
-                            f"pumpon_{delay:+010.3f}ps.tif",
+                            f"pumpon_{delay:+010.3f}ps_processed.h5",
                         )
                     ] = i
                     i += 1
@@ -243,17 +258,70 @@ class SingleShotDataset:
                     self.timestamps.append(
                         self.__str_to_datetime(timestamp)
                     )
-                if "Diagnostic routine started." in line:
+                if "laser background image series acquired" in line:
                     timestamp = self.log_timestamp_pattern.findall(line)[0]
                     self.diagnostic_timestamps.append(
                         self.__str_to_datetime(timestamp)
                     )
         self.timedeltas = [ts-self.timestamps[0] for ts in self.timestamps]
 
+        # allocate memory and load actual images
+        self.diffdata = np.zeros((len(self.delays), self.img_shape[0], self.img_shape[1]), dtype=float)
+        self.data = np.zeros((len(self.delays), self.img_shape[0], self.img_shape[1]), dtype=float)
+        self.real_time_intensities = np.zeros(len(h5_paths))
+        self.real_time_delays = np.zeros(len(h5_paths))
+        imgs_per_delay = np.zeros(len(self.delays)).squeeze()
+
+        if progress:
+            iterable = tqdm(h5_paths, desc=f'loading {self.basedir}')
+        else:
+            iterable = h5_paths
+        for h5path in iterable:
+            with h5py.File(h5path, 'r') as f:
+                img = f['pump_on'][()]
+                img_sum_intensities = f['pump_on_sum_intensities']
+                diffimg = f['difference'][()]
+            if correct_dark:
+                img -= self.dark
+                diffimg -= self.dark
+            if correct_laser:
+                img -= self.laser_only
+                diffimg -= self.laser_only
+            self.real_time_intensities[realtime_idxs[h5path]] = np.mean(img*self.mask)
+            self.real_time_delays[realtime_idxs[h5path]] = self.__delay_from_fname(h5path)
+            if normalize:
+                img /= np.mean(img_sum_intensities)
+            self.data[np.argwhere(self.delays == self.__delay_from_fname(h5path))[0][0]] += img
+            self.diffdata[np.argwhere(self.delays == self.__delay_from_fname(h5path))[0][0]] += diffimg
+            self.all_imgs.append(img)
+            self.all_diffimgs.append(diffimg)
+            imgs_per_delay[np.argwhere(self.delays == self.__delay_from_fname(h5path))[0][0]] += 1
+        self.data /= imgs_per_delay[:, None, None]
+        self.diffdata /= imgs_per_delay[:, None, None]
+        self.mean_img = np.mean(self.data, axis=0)
+        self.mean_diffimg = np.mean(self.diffdata, axis=0)
+
     @staticmethod
     def __str_to_datetime(s):
         return datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
 
+    def __load_diagnostic(self, dataset_key, directories):
+        img_count = 0
+        image = np.zeros(self.img_shape)
+        if isinstance(directories, str):
+            directories = [directories]
+        for directory in directories:
+            for filename in listdir(path.join(self.basedir, directory)):
+                if filename.endswith('_processed.h5'):
+                    with h5py.File(path.join(self.basedir, directory, filename), 'r') as f:
+                        image += f[dataset_key][()]
+                        img_count += self.imgs_per_file
+        return image/img_count
+
+    @staticmethod
+    def __delay_from_fname(fname):
+        return float(fname.split(r"/")[-1][7:17])
+
 
 if __name__ == '__main__':
-    SingleShotDataset('/data/TiSe2_run_0010')
+    SingleShotDataset('/data/TiSe2_run_0010', progress=True)
