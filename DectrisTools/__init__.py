@@ -1,6 +1,6 @@
 import os
 # imports for top-level access
-from lib.processing import SingleShotDataset, SingleShotProcessor
+from .lib.processing import SingleShotDataset, SingleShotProcessor
 
 VERSION = "0.1"
 IP = "fe80::4ed9:8fff:feca:a8f9"
