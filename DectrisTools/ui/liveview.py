@@ -31,6 +31,9 @@ class LiveViewUi(QtWidgets.QMainWindow):
         )
         if self.settings.value("main_window_geometry") is not None:
             self.setGeometry(self.settings.value("main_window_geometry"))
+        if self.settings.value("pin_histogram_zero") is not None:
+            pin_zero = self.settings.value("pin_histogram_zero").lower() == "true"
+            self.actionPinHistogramZero.setChecked(pin_zero)
         if self.settings.value("auto_levels") is not None:
             auto_levels = self.settings.value("auto_levels").lower() == "true"
             self.viewer.view.menu.autoLevels.setChecked(auto_levels)
@@ -100,6 +103,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         )
         hist_range = tuple(self.viewer.ui.histogram.item.vb.viewRange()[1])  # wtf?
         self.settings.setValue("histogram_range", hist_range)
+        self.settings.setValue("pin_histogram_zero", self.actionPinHistogramZero.isChecked())
         self.hide()
         self.image_timer.stop()
         self.status_timer.stop()
@@ -149,6 +153,10 @@ class LiveViewUi(QtWidgets.QMainWindow):
             lambda x=self.actionShowFrame.isChecked(): self.viewer.show_frame(x)
         )
         self.actionShowFrame.setShortcut("F")
+        self.actionPinHistogramZero.setShortcut("H")
+        self.actionPinHistogramZero.triggered.connect(self.pin_histogram_zero)
+        self.viewer.ui.histogram.sigLevelsChanged.connect(self.pin_histogram_zero)
+        self.viewer.ui.histogram.item.vb.sigRangeChangedManually.connect(self.pin_histogram_zero)
 
         trigger_mode_group = QtWidgets.QActionGroup(self)
         trigger_mode_group.addAction(self.actionINTS)
@@ -365,3 +373,15 @@ class LiveViewUi(QtWidgets.QMainWindow):
                     self.remove_roi(i)
                 except Exception:  # again bad practice, but works...
                     pass
+
+    @QtCore.pyqtSlot()
+    def pin_histogram_zero(self):
+        if self.actionPinHistogramZero.isChecked():
+            y_view_max = self.viewer.ui.histogram.item.vb.viewRange()[1][1]
+            y_limit = -0.01 * y_view_max
+            self.viewer.ui.histogram.item.vb.setYRange(y_limit, y_view_max, padding=0)
+
+            y_level_min, y_level_max = self.viewer.ui.histogram.getLevels()
+            if y_level_min != 0:
+                self.viewer.ui.histogram.setLevels(0, y_level_max)
+

@@ -99,6 +99,7 @@
     <addaction name="actionShowMaxPixelValue"/>
     <addaction name="actionShowFrame"/>
     <addaction name="actionShowCrosshair"/>
+    <addaction name="actionPinHistogramZero"/>
    </widget>
    <widget class="QMenu" name="menuDetector">
     <property name="title">
@@ -307,6 +308,17 @@
    </property>
    <property name="toolTip">
     <string>retrigger</string>
+   </property>
+  </action>
+  <action name="actionPinHistogramZero">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Pin Histogram Zero</string>
    </property>
   </action>
  </widget>
