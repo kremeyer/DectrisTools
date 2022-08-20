@@ -103,7 +103,9 @@ class LiveViewUi(QtWidgets.QMainWindow):
         )
         hist_range = tuple(self.viewer.ui.histogram.item.vb.viewRange()[1])  # wtf?
         self.settings.setValue("histogram_range", hist_range)
-        self.settings.setValue("pin_histogram_zero", self.actionPinHistogramZero.isChecked())
+        self.settings.setValue(
+            "pin_histogram_zero", self.actionPinHistogramZero.isChecked()
+        )
         self.hide()
         self.image_timer.stop()
         self.status_timer.stop()
@@ -156,7 +158,9 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.actionPinHistogramZero.setShortcut("H")
         self.actionPinHistogramZero.triggered.connect(self.pin_histogram_zero)
         self.viewer.ui.histogram.sigLevelsChanged.connect(self.pin_histogram_zero)
-        self.viewer.ui.histogram.item.vb.sigRangeChangedManually.connect(self.pin_histogram_zero)
+        self.viewer.ui.histogram.item.vb.sigRangeChangedManually.connect(
+            self.pin_histogram_zero
+        )
 
         trigger_mode_group = QtWidgets.QActionGroup(self)
         trigger_mode_group.addAction(self.actionINTS)
@@ -384,4 +388,3 @@ class LiveViewUi(QtWidgets.QMainWindow):
             y_level_min, y_level_max = self.viewer.ui.histogram.getLevels()
             if y_level_min != 0:
                 self.viewer.ui.histogram.setLevels(0, y_level_max)
-

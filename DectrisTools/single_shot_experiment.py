@@ -152,7 +152,9 @@ def run(cmd_args):
             s_pump.enable(False)
             s_probe.enable(True)
             while True:
-                exception = acquire_image_series(Q, savedir, DIR_PUMP_OFF, f"pump_off_epoch_{time():010.0f}s.h5")
+                exception = acquire_image_series(
+                    Q, savedir, DIR_PUMP_OFF, f"pump_off_epoch_{time():010.0f}s.h5"
+                )
                 if exception:
                     logfile.write(fmt_log(str(exception)))
                 else:

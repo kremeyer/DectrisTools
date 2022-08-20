@@ -1,4 +1,5 @@
 import os
+
 # imports for top-level access
 from .lib.processing import SingleShotDataset, SingleShotProcessor
 
@@ -12,4 +13,3 @@ def get_base_path():
     returns package base dir
     """
     return os.path.dirname(__file__)
-
