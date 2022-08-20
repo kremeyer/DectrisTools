@@ -2,7 +2,7 @@
 Collection of tools for operating the DectrisQuadro camera in the Siwick Lab. Also contains code to manipulate the data taken with the detector.
 
 You may install the package with
-```python3
+```
 python -m pip install git+https://github.com/kremeyer/DectrisTools
 ```
 I am currently developing it in a Python 3.10 environment.
