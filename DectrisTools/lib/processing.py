@@ -45,8 +45,9 @@ class SingleShotProcessor(ThreadPoolExecutor):
 
     BORDERSIZE = 5
 
-    def __init__(self, filelist, mask=None, max_workers=None):
+    def __init__(self, filelist, mask=None, max_workers=None, ignore_existing=False):
         self.filelist = filelist
+        self.ignore_existing = ignore_existing
         self.sample_dataset = h5py.File(filelist[0], "r")["entry/data/data"]
         if max_workers is None:
             # determine max workers from free memory and size of dataset
@@ -108,7 +109,8 @@ class SingleShotProcessor(ThreadPoolExecutor):
             f'{path.join(dirname, Path(filename).stem)}_processed.h5'
         )
         if path.exists(processed_filename):
-            raise OSError(f"{processed_filename} already exists")
+            if not self.ignore_existing:
+                raise OSError(f"{processed_filename} already exists")
         if "pumpon" in filename:
             self.__process_pump_probe(filename, processed_filename)
         elif "pump_off" in filename:
@@ -168,18 +170,20 @@ class SingleShotProcessor(ThreadPoolExecutor):
             border_1 = np.sum(border_1[self.border_mask])
             border_2 = np.sum(border_2[self.border_mask])
             if border_1 > border_2:
+                confidence = border_1 / np.max((border_2, 1e-10))
                 pump_on = images[::2]
                 pump_off = images[1::2]
-                if border_1 / border_2 < 100:
+                if confidence < 100:
                     warnings.warn(
                         f"low confidence in distnguishing pump on/off: {src} frac={border_1 / border_2}",
                         UndistinguishableWarning,
                     )
             else:
+                confidence = border_2 / np.max((border_1, 1e-10))
                 pump_on = images[1::2]
                 pump_off = images[::2]
-                if border_2 / border_1 < 100:
-                    warnings.warn(f"low confidence in distnguishing pump on/off: {src} frac={border_1 / border_2}")
+                if confidence < 100:
+                    warnings.warn(f"low confidence in distnguishing pump on/off: {src} frac={border_2 / border_1}")
         difference_mean = np.zeros((512, 512), dtype='float')
         for on, off in zip(pump_on, pump_off):
             difference_mean += (on.astype('float') - off.astype('float'))
@@ -197,6 +201,7 @@ class SingleShotProcessor(ThreadPoolExecutor):
             f.create_dataset(
                 "difference", data=difference_mean, **hdf5plugin.Bitshuffle()
             )
+            f.create_dataset("confidence", data=confidence)
 
 
 class SingleShotDataset:
@@ -224,8 +229,9 @@ class SingleShotDataset:
 
         self.dark = self.__load_diagnostic('dark', ['laser_background', 'pump_off'])
         self.laser_only = self.__load_diagnostic('laser_bg', 'laser_background')
-        self.pump_off = self.__load_diagnostic('pump_off', 'pump_off')
-        self.all_imgs = []
+        self.pump_off_diagnostic = self.__load_diagnostic('pump_off', 'pump_off')
+        self.all_pump_on_imgs = []
+        self.all_pump_off_imgs = []
         self.all_diffimgs = []
 
         if mask is None:
@@ -269,38 +275,45 @@ class SingleShotDataset:
 
         # allocate memory and load actual images
         self.diffdata = np.zeros((len(self.delays), self.img_shape[0], self.img_shape[1]), dtype=float)
-        self.data = np.zeros((len(self.delays), self.img_shape[0], self.img_shape[1]), dtype=float)
-        self.real_time_intensities = np.zeros(len(h5_paths))
-        self.real_time_delays = np.zeros(len(h5_paths))
+        self.pump_on = np.zeros((len(self.delays), self.img_shape[0], self.img_shape[1]), dtype=float)
+        self.pump_off = np.zeros((len(self.delays), self.img_shape[0], self.img_shape[1]), dtype=float)
+        self.real_time_intensities = np.zeros(len(realtime_idxs))
+        self.real_time_delays = np.zeros(len(realtime_idxs))
         imgs_per_delay = np.zeros(len(self.delays)).squeeze()
-
         if progress:
             iterable = tqdm(h5_paths, desc=f'loading {self.basedir}')
         else:
             iterable = h5_paths
         for h5path in iterable:
             with h5py.File(h5path, 'r') as f:
-                img = f['pump_on'][()]
-                img_sum_intensities = f['pump_on_sum_intensities']
+                img_pump_on = f['pump_on'][()]
+                img_pump_off = f['pump_off'][()]
+                img_pump_on_sum_intensities = f['pump_on_sum_intensities'][()]
+                img_pump_off_sum_intensities = f['pump_off_sum_intensities'][()]
                 diffimg = f['difference'][()]
             if correct_dark:
-                img -= self.dark
+                img_pump_on -= self.dark
+                img_pump_off -= self.dark
                 diffimg -= self.dark
             if correct_laser:
-                img -= self.laser_only
+                img_pump_on -= self.laser_only
+                img_pump_off -= self.laser_only
                 diffimg -= self.laser_only
-            self.real_time_intensities[realtime_idxs[h5path]] = np.mean(img*self.mask)
+            self.real_time_intensities[realtime_idxs[h5path]] = np.mean(img_pump_on*self.mask)
             self.real_time_delays[realtime_idxs[h5path]] = self.__delay_from_fname(h5path)
             if normalize:
-                img /= np.mean(img_sum_intensities)
-            self.data[np.argwhere(self.delays == self.__delay_from_fname(h5path))[0][0]] += img
+                img_pump_on /= np.mean(img_pump_on_sum_intensities)
+                img_pump_off /= np.mean(img_pump_off_sum_intensities)
+            self.pump_on[np.argwhere(self.delays == self.__delay_from_fname(h5path))[0][0]] += img_pump_on
+            self.pump_off[np.argwhere(self.delays == self.__delay_from_fname(h5path))[0][0]] += img_pump_off
             self.diffdata[np.argwhere(self.delays == self.__delay_from_fname(h5path))[0][0]] += diffimg
-            self.all_imgs.append(img)
+            self.all_pump_on_imgs.append(img_pump_on)
+            self.all_pump_off_imgs.append(img_pump_off)
             self.all_diffimgs.append(diffimg)
             imgs_per_delay[np.argwhere(self.delays == self.__delay_from_fname(h5path))[0][0]] += 1
-        self.data /= imgs_per_delay[:, None, None]
+        self.pump_on /= imgs_per_delay[:, None, None]
         self.diffdata /= imgs_per_delay[:, None, None]
-        self.mean_img = np.mean(self.data, axis=0)
+        self.mean_img = np.mean(self.pump_on, axis=0)
         self.mean_diffimg = np.mean(self.diffdata, axis=0)
 
     @staticmethod
