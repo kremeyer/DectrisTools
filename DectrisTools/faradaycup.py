@@ -42,20 +42,8 @@ def run(args):
     plt.xlabel('Waveplate angle')
     plt.ylabel('electrons per shot')
     plt.show()        
-args = parse_args()
-run(args)
-
-
-        
-
-
-
-
-
-
-
-
 
 if __name__ = '__main__':
-    run()
+    args = parse_args()
+    run(args)
 
