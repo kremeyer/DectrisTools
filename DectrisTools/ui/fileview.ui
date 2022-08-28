@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1080</width>
+    <height>1000</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>810</width>
+    <height>750</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>DectrisFileView</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QGridLayout" name="gridLayout_2">
+    <item row="0" column="0">
+     <layout class="QGridLayout" name="gridLayout">
+      <item row="1" column="0">
+       <layout class="QHBoxLayout" name="horizontalLayout"/>
+      </item>
+      <item row="0" column="0">
+       <widget class="ImageViewWidget" name="viewer" native="true">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>720</width>
+          <height>650</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1080</width>
+     <height>22</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuROI">
+    <property name="title">
+     <string>ROI</string>
+    </property>
+    <addaction name="actionAddRectangle"/>
+    <addaction name="actionRemoveLastROI"/>
+    <addaction name="actionRemoveAllROIs"/>
+    <addaction name="actionLinkYAxis"/>
+   </widget>
+   <widget class="QMenu" name="menuView">
+    <property name="title">
+     <string>View</string>
+    </property>
+    <addaction name="actionShowFrame"/>
+    <addaction name="actionShowCrosshair"/>
+    <addaction name="actionPinHistogramZero"/>
+   </widget>
+   <addaction name="menuROI"/>
+   <addaction name="menuView"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar">
+   <property name="minimumSize">
+    <size>
+     <width>0</width>
+     <height>25</height>
+    </size>
+   </property>
+  </widget>
+  <action name="actionAddRectangle">
+   <property name="text">
+    <string>Add Rectangle</string>
+   </property>
+  </action>
+  <action name="actionRemoveRectangle">
+   <property name="text">
+    <string>Remove Rectangle</string>
+   </property>
+  </action>
+  <action name="actionLinkYAxis">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Link Y Axis</string>
+   </property>
+  </action>
+  <action name="actionShow_Projections">
+   <property name="text">
+    <string>Show Projections</string>
+   </property>
+  </action>
+  <action name="actionROI">
+   <property name="text">
+    <string>ROI</string>
+   </property>
+  </action>
+  <action name="actionShowProjections">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Show Projections</string>
+   </property>
+  </action>
+  <action name="actionAutoRange">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Auto Range</string>
+   </property>
+  </action>
+  <action name="actionRemoveLastROI">
+   <property name="text">
+    <string>Remove Last ROI</string>
+   </property>
+  </action>
+  <action name="actionRemoveAllROIs">
+   <property name="text">
+    <string>Remove All ROIs</string>
+   </property>
+  </action>
+  <action name="actionINTS">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>ints</string>
+   </property>
+   <property name="toolTip">
+    <string>ints</string>
+   </property>
+  </action>
+  <action name="actionEXTS">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>exts</string>
+   </property>
+   <property name="toolTip">
+    <string>exts</string>
+   </property>
+  </action>
+  <action name="actionEXTE">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>exte</string>
+   </property>
+   <property name="toolTip">
+    <string>exte</string>
+   </property>
+  </action>
+  <action name="actionStop">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>stop</string>
+   </property>
+  </action>
+  <action name="actionShowMaxPixelValue">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Show Max Pixel Value</string>
+   </property>
+  </action>
+  <action name="actionShowFrame">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show Frame</string>
+   </property>
+  </action>
+  <action name="actionAutoLevels">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Auto Levels</string>
+   </property>
+  </action>
+  <action name="actionShowCrosshair">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show Crosshair</string>
+   </property>
+  </action>
+  <action name="actionCmodeNormal">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>normal</string>
+   </property>
+   <property name="toolTip">
+    <string>normal</string>
+   </property>
+  </action>
+  <action name="actionCmodeRetrigger">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>retrigger</string>
+   </property>
+   <property name="toolTip">
+    <string>retrigger</string>
+   </property>
+  </action>
+  <action name="actionPinHistogramZero">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Pin Histogram Zero</string>
+   </property>
+  </action>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>ImageViewWidget</class>
+   <extends>QWidget</extends>
+   <header location="global">DectrisTools.ui.widgets</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

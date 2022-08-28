@@ -1,5 +1,7 @@
+from os import path
 import logging as log
-from PyQt5 import QtWidgets, QtCore
+from PyQt5 import QtWidgets, QtCore, uic
+from .. import get_base_path
 
 
 class FileViewUi(QtWidgets.QMainWindow):
@@ -9,6 +11,7 @@ class FileViewUi(QtWidgets.QMainWindow):
     def __init__(self, *args, **kwargs):
         log.debug("initializing DectrisFileView")
         super().__init__(*args, **kwargs)
+        uic.loadUi(path.join(get_base_path(), "ui/fileview.ui"), self)
 
         self.settings = QtCore.QSettings(
             "Siwick Research Group", "DectrisTools Fileview", parent=self
