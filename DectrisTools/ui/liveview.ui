@@ -27,7 +27,7 @@
        <layout class="QHBoxLayout" name="horizontalLayout"/>
       </item>
       <item row="0" column="0">
-       <widget class="ImageViewWidget" name="viewer" native="true">
+       <widget class="ImageView" name="viewer" native="true">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
           <horstretch>0</horstretch>
@@ -297,7 +297,7 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>ImageViewWidget</class>
+   <class>ImageView</class>
    <extends>QWidget</extends>
    <header location="global">DectrisTools.ui.widgets</header>
    <container>1</container>

@@ -8,7 +8,7 @@ import numpy as np
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
 
 
-class ImageViewWidget(pg.ImageView):
+class ImageView(pg.ImageView):
     x_size = 0
     y_size = 0
     image = None
@@ -292,3 +292,7 @@ class ROIView(pg.GraphicsLayoutWidget):
         else:
             for p in self.plots:
                 p.setYLink(None)
+
+
+class FileView(ImageView):
+    fps = 30

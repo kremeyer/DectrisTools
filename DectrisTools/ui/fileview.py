@@ -12,7 +12,7 @@ class FileViewUi(QtWidgets.QMainWindow):
     """
     main window of the fileview application
     """
-    __PIL_IMAGE_FORMATS = ('.npy', '.tif', '.tiff', '.bmp', '.eps', '.gif', '.jpeg', '.jpg', '.png')
+    __PIL_IMAGE_FORMATS = ('.tif', '.tiff', '.bmp', '.eps', '.gif', '.jpeg', '.jpg', '.png')
 
     def __init__(self, *args, **kwargs):
         log.debug("initializing DectrisFileView")
