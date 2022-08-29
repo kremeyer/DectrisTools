@@ -14,6 +14,7 @@ class ImageViewWidget(pg.ImageView):
     image = None
     raw_image = None
     cursor_changed = pyqtSignal(tuple)
+    pin_histogram_zero = False
 
     def __init__(self, parent=None, cmap="inferno"):
         log.debug("initializing ImageViewWidget")
@@ -32,6 +33,9 @@ class ImageViewWidget(pg.ImageView):
         self.view.menu.linScale.triggered.connect(self.update_scale)
         self.view.menu.logScale.triggered.connect(self.update_scale)
         self.view.menu.sqrtScale.triggered.connect(self.update_scale)
+
+        self.ui.histogram.sigLevelsChanged.connect(self.pin_histogram_zero)
+        self.ui.histogram.item.vb.sigRangeChangedManually.connect(self.pin_histogram_zero)
 
         self.proxy = pg.SignalProxy(
             self.scene.sigMouseMoved, rateLimit=60, slot=self.__callback_move
@@ -62,7 +66,7 @@ class ImageViewWidget(pg.ImageView):
     def setImage(self, *args, max_label=False, projections=False, **kwargs):
         self.raw_image = copy(args[0])
         self.image = args[0]
-        self.x_size, self.y_size = self.image.shape
+        self.x_size, self.y_size = self.image.shape[-2:]
 
         if self.view.menu.logScale.isChecked():
             self.image = np.log(self.image, where=self.image > 0)
@@ -177,6 +181,17 @@ class ImageViewWidget(pg.ImageView):
                         self.view.removeItem(i)
                     except ValueError:
                         pass
+
+    @pyqtSlot()
+    def pin_histogram_zero(self):
+        if self.pin_histogram_zero:
+            y_view_max = self.ui.histogram.item.vb.viewRange()[1][1]
+            y_limit = -0.01 * y_view_max
+            self.ui.histogram.item.vb.setYRange(y_limit, y_view_max, padding=0)
+
+            y_level_min, y_level_max = self.ui.histogram.getLevels()
+            if y_level_min != 0:
+                self.ui.histogram.setLevels(0, y_level_max)
 
 
 class ViewBoxMenu(pg.graphicsItems.ViewBox.ViewBoxMenu.ViewBoxMenu):

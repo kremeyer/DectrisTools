@@ -104,6 +104,8 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.settings.setValue(
             "auto_levels", self.viewer.view.menu.autoLevels.isChecked()
         )
+        # this is now easier, can be changed, when new version of pyqtgraph is released
+        # https://github.com/pyqtgraph/pyqtgraph/pull/2397
         hist_range = tuple(self.viewer.ui.histogram.item.vb.viewRange()[1])  # wtf?
         self.settings.setValue("histogram_range", hist_range)
         self.settings.setValue(
@@ -169,10 +171,6 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.actionShowFrame.setShortcut("F")
         self.actionPinHistogramZero.setShortcut("H")
         self.actionPinHistogramZero.triggered.connect(self.pin_histogram_zero)
-        self.viewer.ui.histogram.sigLevelsChanged.connect(self.pin_histogram_zero)
-        self.viewer.ui.histogram.item.vb.sigRangeChangedManually.connect(
-            self.pin_histogram_zero
-        )
 
         trigger_mode_group = QtWidgets.QActionGroup(self)
         trigger_mode_group.addAction(self.actionINTS)
@@ -390,13 +388,5 @@ class LiveViewUi(QtWidgets.QMainWindow):
                 except Exception:  # again bad practice, but works...
                     pass
 
-    @QtCore.pyqtSlot()
-    def pin_histogram_zero(self):
-        if self.actionPinHistogramZero.isChecked():
-            y_view_max = self.viewer.ui.histogram.item.vb.viewRange()[1][1]
-            y_limit = -0.01 * y_view_max
-            self.viewer.ui.histogram.item.vb.setYRange(y_limit, y_view_max, padding=0)
-
-            y_level_min, y_level_max = self.viewer.ui.histogram.getLevels()
-            if y_level_min != 0:
-                self.viewer.ui.histogram.setLevels(0, y_level_max)
+    def set_pin_histogram_zero(self):
+        self.viewer.pin_histogram_zero = self.actionPinHistogramZero.isChecked()
