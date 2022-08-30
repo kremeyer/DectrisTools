@@ -295,4 +295,17 @@ class ROIView(pg.GraphicsLayoutWidget):
 
 
 class FileView(ImageView):
-    fps = 30
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fps = 30
+
+        self.timeLine.sigPositionChanged.connect(self.repeat)
+
+    def repeat(self):
+        if self.currentIndex + 1 == self.image.shape[self.axes["t"]]:
+            if self.playTimer.isActive():
+                self.setCurrentIndex(0)
+                self.play()
+
+    def updateImage(self, autoHistogramRange=False):
+        super().updateImage(autoHistogramRange)
