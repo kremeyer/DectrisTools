@@ -145,9 +145,14 @@ def run(cmd_args):
         for i in tqdm(range(cmd_args.n_scans), desc="scans"):
             s_pump.enable(True)
             s_probe.enable(False)
-            acquire_image_series(
-                Q, savedir, DIR_LASER_BG, f"laser_bg_epoch_{time():010.0f}s.h5"
-            )
+            while True:
+                exception = acquire_image_series(
+                    Q, savedir, DIR_LASER_BG, f"laser_bg_epoch_{time():010.0f}s.h5"
+                )
+                if exception:
+                    logfile.write(fmt_log(str(exception)))
+                else:
+                    break
             logfile.write(fmt_log("laser background image series acquired"))
             s_pump.enable(False)
             s_probe.enable(True)
@@ -170,7 +175,12 @@ def run(cmd_args):
 
                 delay_stage.absolute_time(delay, T0_POS)
                 delay_stage._wait_end_of_move()
-                acquire_image_series(Q, savedir, scandir, filename)
+                while True:
+                    exception = acquire_image_series(Q, savedir, scandir, filename)
+                    if exception:
+                        logfile.write(fmt_log(str(exception)))
+                    else:
+                        break
                 logfile.write(
                     fmt_log(
                         f"pump on image series acquired at scan {i+1} and time-delay {delay:.1f}ps"
