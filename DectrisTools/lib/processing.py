@@ -38,8 +38,8 @@ class SingleShotProcessor(ThreadPoolExecutor):
     /pump_on_sum_intensities  Dataset {N/2} -> sum intensity of every pump on image
 
     Example:
-    >>> from pathlib import Path
-    >>> from concurrent.futures import as_completed
+    >>>from pathlib import Path
+    >>>from concurrent.futures import as_completed
 
     >>>rundir = "/data/TiSe2_run_0010"
     >>>with SingleShotProcessor([str(p) for p in Path(rundir).rglob("*.h5")], max_workers=1) as ssp:
@@ -216,7 +216,7 @@ class SingleShotDataset:
     log_delay_pattern = re.compile(r"time-delay -?\d*.?\d*ps")
     log_scan_pattern = re.compile(r"scan \d*")
 
-    def __init__(self, basedir, mask=None, normalize=False, progress=False, correct_dark=True, correct_laser=True):
+    def __init__(self, basedir, mask=None, normalize=True, progress=False, correct_dark=True, correct_laser=True):
         self.basedir = basedir
 
         h5_paths = []
@@ -284,7 +284,7 @@ class SingleShotDataset:
         self.pump_off = np.zeros((len(self.delays), self.img_shape[0], self.img_shape[1]), dtype=float)
         self.real_time_intensities = np.zeros(len(realtime_idxs))
         self.real_time_delays = np.zeros(len(realtime_idxs))
-        imgs_per_delay = np.zeros(len(self.delays)).squeeze()
+        files_per_delay = np.zeros(len(self.delays)).squeeze()
         if progress:
             iterable = tqdm(h5_paths, desc=f'loading {self.basedir}')
         else:
@@ -299,12 +299,12 @@ class SingleShotDataset:
             if correct_dark:
                 img_pump_on -= self.dark
                 img_pump_off -= self.dark
-                diffimg -= self.dark
+                # diffimg -= self.dark
             if correct_laser:
                 img_pump_on -= self.laser_only
                 img_pump_off -= self.laser_only
-                diffimg -= self.laser_only
-            self.real_time_intensities[realtime_idxs[h5path]] = np.mean(img_pump_on*self.mask)
+                # diffimg -= self.laser_only
+            self.real_time_intensities[realtime_idxs[h5path]] = np.sum(img_pump_on*self.mask)
             self.real_time_delays[realtime_idxs[h5path]] = self.__delay_from_fname(h5path)
             if normalize:
                 img_pump_on /= np.mean(img_pump_on_sum_intensities)
@@ -315,9 +315,10 @@ class SingleShotDataset:
             self.all_pump_on_imgs.append(img_pump_on)
             self.all_pump_off_imgs.append(img_pump_off)
             self.all_diffimgs.append(diffimg)
-            imgs_per_delay[np.argwhere(self.delays == self.__delay_from_fname(h5path))[0][0]] += 1
-        self.pump_on /= imgs_per_delay[:, None, None]
-        self.diffdata /= imgs_per_delay[:, None, None]
+            files_per_delay[np.argwhere(self.delays == self.__delay_from_fname(h5path))[0][0]] += 1
+        self.pump_on /= files_per_delay[:, None, None]
+        self.pump_off /= files_per_delay[:, None, None]
+        self.diffdata /= files_per_delay[:, None, None]
         self.mean_img = np.mean(self.pump_on, axis=0)
         self.mean_diffimg = np.mean(self.diffdata, axis=0)
 
