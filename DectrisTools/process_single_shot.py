@@ -12,7 +12,7 @@ if __name__ == "__main__":
         max_workers = sys.argv[2]
     except IndexError:
         max_workers = None
-    filelist = [str(p) for p in Path(rundir).rglob("*.h5")]
+    filelist = [str(p) for p in Path(rundir).rglob("*ps.h5")]
     with SingleShotProcessor(filelist, max_workers=max_workers) as ssp:
         ssp.start()
         for future in tqdm(as_completed(ssp.futures), total=len(filelist)):
