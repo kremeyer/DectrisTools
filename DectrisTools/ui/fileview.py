@@ -2,6 +2,9 @@ import os
 from collections.abc import Iterable
 from os import path
 import logging as log
+from psutil import virtual_memory
+
+import h5py
 import numpy as np
 from PyQt5 import QtWidgets, QtCore, uic
 from PIL import Image
@@ -84,6 +87,12 @@ class FileViewUi(QtWidgets.QMainWindow):
         paths = [u.toLocalFile() for u in event.mimeData().urls()]
         images = []
         for p in paths:
+            # We need to check if we can fit more images into memory and still if we're still able to convert
+            # them into an array later. A more appropiate solution would be to check all the dropped files first, allocate
+            # the numpy array and then fill it with data. However, this works for now.
+            if images:
+                if virtual_memory() * 0.45 < images[0].__sizeof__():
+                    break
             if path.isfile(p):
                 from_file = self.load_from_file(p)
                 if isinstance(from_file, Iterable):
@@ -106,13 +115,13 @@ class FileViewUi(QtWidgets.QMainWindow):
             self.viewer.setImage(np.array(images))
 
     def load_from_file(self, file):
-        images = []
         if path.isfile(file):
             if file.lower().endswith(self.__PIL_IMAGE_FORMATS):
                 image_array = np.array(Image.open(file))
                 if image_array.ndim == 3:
                     image_array = np.mean(image_array, axis=2)
-                images.append(image_array)
+                return image_array
             if file.lower().endswith('.h5'):
-                pass
-        return images
+                # try to find images in the default Dectris location
+                with h5py.File(file, 'r') as f:
+                    return f['entry/data/data'][()]
