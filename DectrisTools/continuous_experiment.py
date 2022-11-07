@@ -1,4 +1,5 @@
 import warnings
+from sys.stdout import flush
 from argparse import ArgumentParser
 from random import shuffle
 from time import sleep, time
@@ -16,6 +17,7 @@ warnings.simplefilter("ignore", ResourceWarning)
 
 DIR_PUMP_OFF = "pump_off"
 DIR_LASER_BG = "laser_background"
+DIR_DARK = "dark_image"
 T0_POS = 27.1083
 
 
@@ -43,13 +45,8 @@ def parse_args():
     )
     parser.add_argument("--savedir", type=str, help="save directory")
     parser.add_argument("--n_scans", type=int, help="number of scans")
-    parser.add_argument(
-        "--images_per_datapoint",
-        type=int,
-        default=30_000,
-        help="number of images per datapoint",
-    )
     parser.add_argument("--delays", type=str)
+    parser.add_argument("--exposure", type=float, default=30, help="exposure time of each image")
     args = parser.parse_args()
     return args
 
@@ -83,10 +80,11 @@ def parse_timedelays(time_str):
     return list(sorted(timedelays))
 
 
-def acquire_image_series(detector, savedir, scandir, filename):
+def acquire_image(detector, savedir, scandir, filename):
     exception = None
     try:
         detector.arm()
+        detector.trigger()
         sleep(0.1)
         while detector.state != "idle":
             sleep(0.05)
@@ -118,12 +116,12 @@ def run(cmd_args):
     Q.fw.nimages_per_file = 0
     Q.fw.mode = "enabled"
     Q.fw.clear()
-    Q.trigger_mode = "exte"
+    Q.trigger_mode = "ints"
     Q.mon.mode = "disabled"
 
-    Q.ntrigger = cmd_args.images_per_datapoint
-    Q.frame_time = 0.001
-    Q.count_time = 0.00025
+    Q.ntrigger = 1
+    Q.frame_time = cmd_args.exposure
+    Q.count_time = cmd_args.exposure
 
     s_pump = SC10Shutter(args.pump_shutter_port)
     s_pump.set_operating_mode("manual")
@@ -136,56 +134,69 @@ def run(cmd_args):
     logfile = open(path.join(savedir, "experiment.log"), "w+")
     logfile.write(
         fmt_log(
-            f"starting experiment with {cmd_args.n_scans} scans at {len(delays)} delays, each image series contains {cmd_args.images_per_datapoint} images"
+            f"starting experiment with {cmd_args.n_scans} scans at {len(delays)} delays"
         )
     )
+    flush()
     try:
         mkdir(path.join(savedir, DIR_LASER_BG))
         mkdir(path.join(savedir, DIR_PUMP_OFF))
+        mkdir(path.join(savedir, DIR_DARK))
         for i in tqdm(range(cmd_args.n_scans), desc="scans"):
+            s_pump.enable(False)
+            s_probe.enable(False)
+            while True:
+                exception = acquire_image(
+                    Q, savedir, DIR_LASER_BG, f"dark_epoch_{time():010.0f}s.tif"
+                )
+                if exception:
+                    logfile.write(fmt_log(str(exception)))
+                else:
+                    break
             s_pump.enable(True)
             s_probe.enable(False)
             while True:
-                exception = acquire_image_series(
-                    Q, savedir, DIR_LASER_BG, f"laser_bg_epoch_{time():010.0f}s.h5"
+                exception = acquire_image(
+                    Q, savedir, DIR_LASER_BG, f"laser_bg_epoch_{time():010.0f}s.tif"
                 )
                 if exception:
                     logfile.write(fmt_log(str(exception)))
                 else:
                     break
-            logfile.write(fmt_log("laser background image series acquired"))
+            logfile.write(fmt_log("laser background image acquired"))
             s_pump.enable(False)
             s_probe.enable(True)
             while True:
-                exception = acquire_image_series(
-                    Q, savedir, DIR_PUMP_OFF, f"pump_off_epoch_{time():010.0f}s.h5"
+                exception = acquire_image(
+                    Q, savedir, DIR_PUMP_OFF, f"pump_off_epoch_{time():010.0f}s.tif"
                 )
                 if exception:
                     logfile.write(fmt_log(str(exception)))
                 else:
                     break
-            logfile.write(fmt_log("pump off image series acquired"))
+            logfile.write(fmt_log("pump off image acquired"))
             s_pump.enable(True)
 
             scandir = f"scan_{i+1:04d}"
             mkdir(path.join(savedir, scandir))
             shuffle(delays)
             for delay in tqdm(delays, leave=False, desc="delay steps"):
-                filename = f"pumpon_{delay:+010.3f}ps.h5"
+                filename = f"pumpon_{delay:+010.3f}ps.tif"
 
                 delay_stage.absolute_time(delay, T0_POS)
                 delay_stage._wait_end_of_move()
                 while True:
-                    exception = acquire_image_series(Q, savedir, scandir, filename)
+                    exception = acquire_image(Q, savedir, scandir, filename)
                     if exception:
                         logfile.write(fmt_log(str(exception)))
                     else:
                         break
                 logfile.write(
                     fmt_log(
-                        f"pump on image series acquired at scan {i+1} and time-delay {delay:.1f}ps"
+                        f"pump on image acquired at scan {i+1} and time-delay {delay:.1f}ps"
                     )
                 )
+                flush()
 
         s_pump.enable(False)
         s_probe.enable(False)
