@@ -3,6 +3,7 @@ module for data processing tools
 """
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Thread
+from collections.abc import Iterable
 import warnings
 from os import path, listdir
 from pathlib import Path
@@ -66,7 +67,7 @@ class SingleShotProcessor(ThreadPoolExecutor):
             )
             if datasets_in_memory == 0:
                 warnings.warn(
-                    "you might want to free up some system memory; you can fit a whole dataset into it",
+                    "you might want to free up some system memory; you can't fit a whole dataset into it",
                     ResourceWarning,
                 )
                 datasets_in_memory = 1
@@ -175,15 +176,17 @@ class SingleShotProcessor(ThreadPoolExecutor):
             border_1 = np.sum(border_1[self.border_mask])
             border_2 = np.sum(border_2[self.border_mask])
             if border_1 > border_2:
+                first_image_type = 'pump_on'
                 confidence = border_1 / np.max((border_2, 1e-10))
                 pump_on = images[::2]
                 pump_off = images[1::2]
                 if confidence < 100:
                     warnings.warn(
-                        f"low confidence in distnguishing pump on/off: {src} frac={border_1 / border_2}",
+                        f"low confidence in distinguishing pump on/off: {src} frac={border_1 / border_2}",
                         UndistinguishableWarning,
                     )
             else:
+                first_image_type = 'pump_off'
                 confidence = border_2 / np.max((border_1, 1e-10))
                 pump_on = images[1::2]
                 pump_off = images[::2]
@@ -207,6 +210,7 @@ class SingleShotProcessor(ThreadPoolExecutor):
                 "difference", data=difference_mean, **hdf5plugin.Bitshuffle()
             )
             f.create_dataset("confidence", data=confidence)
+            f.create_dataset("first_image_type", data=first_image_type)
 
 
 class SingleShotDataset:
@@ -216,15 +220,23 @@ class SingleShotDataset:
     log_delay_pattern = re.compile(r"time-delay -?\d*.?\d*ps")
     log_scan_pattern = re.compile(r"scan \d*")
 
-    def __init__(self, basedir, mask=None, normalize=True, progress=False, correct_dark=True, correct_laser=True):
+    def __init__(self, basedir, mask=None, normalize=True, progress=False, correct_dark=True, correct_laser=True, scans=slice(None)):
         self.basedir = basedir
 
+        if scans is not slice(None) and not isinstance(scans, slice):
+            if isinstance(scans, list):
+                pass
+            elif isinstance(scans, Iterable):
+                scans = slice(*scans)
+            else:
+                scans = slice(scans)
+
+        scan_paths = [entry for entry in sorted(listdir(basedir)) if entry.startswith("scan_") and path.isdir(path.join(basedir, entry))][scans]
         h5_paths = []
-        for entry in listdir(self.basedir):
-            if entry.startswith("scan_"):
-                for file in listdir(path.join(self.basedir, entry)):
-                    if file.endswith('_processed.h5'):
-                        h5_paths.append(path.join(self.basedir, entry, file))
+        for p in scan_paths:
+            for file in listdir(path.join(self.basedir, p)):
+                if file.endswith('_processed.h5'):
+                    h5_paths.append(path.join(self.basedir, p, file))
         h5_paths = sorted(h5_paths)
 
         # detect image shape and image count per file
@@ -235,9 +247,6 @@ class SingleShotDataset:
         self.dark = self.__load_diagnostic('dark', ['laser_background', 'pump_off'])
         self.laser_only = self.__load_diagnostic('laser_bg', 'laser_background')
         self.pump_off_diagnostic = self.__load_diagnostic('pump_off', 'pump_off')
-        self.all_pump_on_imgs = []
-        self.all_pump_off_imgs = []
-        self.all_diffimgs = []
 
         if mask is None:
             self.mask = np.ones(self.img_shape).astype("int")
@@ -282,6 +291,11 @@ class SingleShotDataset:
         self.diffdata = np.zeros((len(self.delays), self.img_shape[0], self.img_shape[1]), dtype=float)
         self.pump_on = np.zeros((len(self.delays), self.img_shape[0], self.img_shape[1]), dtype=float)
         self.pump_off = np.zeros((len(self.delays), self.img_shape[0], self.img_shape[1]), dtype=float)
+
+        # self.all_pump_on_imgs = np.zeros((len(h5_paths), self.img_shape[0], self.img_shape[1]), dtype=float)
+        # self.all_pump_off_imgs = np.zeros((len(h5_paths), self.img_shape[0], self.img_shape[1]), dtype=float)
+        self.all_diffimgs = np.zeros((len(h5_paths), self.img_shape[0], self.img_shape[1]), dtype=float)
+
         self.real_time_intensities = np.zeros(len(realtime_idxs))
         self.real_time_delays = np.zeros(len(realtime_idxs))
         files_per_delay = np.zeros(len(self.delays)).squeeze()
@@ -289,7 +303,7 @@ class SingleShotDataset:
             iterable = tqdm(h5_paths, desc=f'loading {self.basedir}')
         else:
             iterable = h5_paths
-        for h5path in iterable:
+        for i, h5path in enumerate(iterable):
             with h5py.File(h5path, 'r') as f:
                 img_pump_on = f['pump_on'][()]
                 img_pump_off = f['pump_off'][()]
@@ -299,11 +313,9 @@ class SingleShotDataset:
             if correct_dark:
                 img_pump_on -= self.dark
                 img_pump_off -= self.dark
-                # diffimg -= self.dark
             if correct_laser:
                 img_pump_on -= self.laser_only
                 img_pump_off -= self.laser_only
-                # diffimg -= self.laser_only
             self.real_time_intensities[realtime_idxs[h5path]] = np.sum(img_pump_on*self.mask)
             self.real_time_delays[realtime_idxs[h5path]] = self.__delay_from_fname(h5path)
             if normalize:
@@ -312,9 +324,9 @@ class SingleShotDataset:
             self.pump_on[np.argwhere(self.delays == self.__delay_from_fname(h5path))[0][0]] += img_pump_on
             self.pump_off[np.argwhere(self.delays == self.__delay_from_fname(h5path))[0][0]] += img_pump_off
             self.diffdata[np.argwhere(self.delays == self.__delay_from_fname(h5path))[0][0]] += diffimg
-            self.all_pump_on_imgs.append(img_pump_on)
-            self.all_pump_off_imgs.append(img_pump_off)
-            self.all_diffimgs.append(diffimg)
+            # self.all_pump_on_imgs[i] = img_pump_on
+            # self.all_pump_off_imgs[i] = img_pump_off
+            self.all_diffimgs[i] = diffimg
             files_per_delay[np.argwhere(self.delays == self.__delay_from_fname(h5path))[0][0]] += 1
         self.pump_on /= files_per_delay[:, None, None]
         self.pump_off /= files_per_delay[:, None, None]
