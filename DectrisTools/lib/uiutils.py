@@ -70,6 +70,7 @@ class DectrisImageGrabber(QObject):
         """
         log.debug(f'started image_grabber_thread {self.image_grabber_thread.currentThread()}')
         if self.connected:
+            self.Q.ntrigger = 1
             self.Q.arm()
             # logic for different trigger modes
             if self.Q.trigger_mode == 'ints':
