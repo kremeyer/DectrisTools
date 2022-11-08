@@ -49,7 +49,7 @@ class SingleShotProcessor(ThreadPoolExecutor):
     >>>        print(ssp[future])
     """
 
-    BORDERSIZE = 5
+    BORDERSIZE = 8
 
     def __init__(self, filelist, mask=None, max_workers=None, ignore_existing=False):
         self.filelist = filelist
@@ -78,10 +78,10 @@ class SingleShotProcessor(ThreadPoolExecutor):
         else:
             self.mask = mask
         self.n_imgs = self.sample_dataset.shape[0]
-        self.border_mask = np.ones(self.img_size).astype("bool")
+        self.border_mask = np.ones(self.img_size)
         self.border_mask[
             self.BORDERSIZE: -self.BORDERSIZE, self.BORDERSIZE: -self.BORDERSIZE
-        ] = False
+        ] = 0
         self.futures = {}
         super().__init__(max_workers=max_workers)
 
@@ -141,9 +141,9 @@ class SingleShotProcessor(ThreadPoolExecutor):
                 data_intensities = np.array([np.sum(img*self.mask) for img in images[::2]])  # using list to save memory
                 dark_mean = np.mean(images[1::2], axis=0)
                 dark_intensities = np.array([np.sum(img*self.mask) for img in images[1::2]])  # using list to save memory
-                if sum_1 / np.max((sum_2, 1e-10)) < 100:
+                if sum_1 / np.max((sum_2, 1e-10)) < 2:
                     warnings.warn(
-                        "low confidence in distnguishing pump on/off data",
+                        f"low confidence in distnguishing darks: {src} frac={sum_1 / sum_2}",
                         UndistinguishableWarning,
                     )
             else:
@@ -151,9 +151,9 @@ class SingleShotProcessor(ThreadPoolExecutor):
                 data_intensities = np.array([np.sum(img*self.mask) for img in images[1::2]])  # using list to save memory
                 dark_mean = np.mean(images[::2], axis=0)
                 dark_intensities = np.array([np.sum(img*self.mask) for img in images[::2]])  # using list to save memory
-                if sum_2 / np.max((sum_2, 1e-10)) < 100:
+                if sum_2 / np.max((sum_2, 1e-10)) < 2:
                     warnings.warn(
-                        "low confidence in distnguishing pump on/off data",
+                        f"low confidence in distnguishing darks: {src} frac={sum_1 / sum_2}",
                         UndistinguishableWarning,
                     )
 
@@ -166,15 +166,15 @@ class SingleShotProcessor(ThreadPoolExecutor):
     def __process_pump_probe(self, src, dest):
         with h5py.File(src, "r") as f:
             images = f["entry/data/data"][()]
-            # look at the borders of the first 100 images and compare them
-            if self.n_imgs > 100:
-                border_1 = np.sum(images[:100:2], axis=0)
-                border_2 = np.sum(images[1:101:2], axis=0)
+            # look at the borders of the the 10th block of 100 images and compare them
+            if self.n_imgs > 1000:
+                border_1 = np.sum(images[900:1000:2], axis=0)
+                border_2 = np.sum(images[901:1001:2], axis=0)
             else:
                 border_1 = np.sum(images[::2], axis=0)
                 border_2 = np.sum(images[1::2], axis=0)
-            border_1 = np.sum(border_1[self.border_mask])
-            border_2 = np.sum(border_2[self.border_mask])
+            border_1 = np.sum(border_1 * self.border_mask)
+            border_2 = np.sum(border_2 * self.border_mask)
             if border_1 > border_2:
                 first_image_type = 'pump_on'
                 confidence = border_1 / np.max((border_2, 1e-10))
