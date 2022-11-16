@@ -24,6 +24,10 @@ class UndistinguishableWarning(Warning):
     pass
 
 
+class BrokenImageWarning(Warning):
+    pass
+
+
 class SingleShotProcessor(ThreadPoolExecutor):
     """class to process hdf5 files from single shot experiments
     each hdf5 file will contain a series of images that are contain pump on/off data
@@ -129,6 +133,16 @@ class SingleShotProcessor(ThreadPoolExecutor):
     def __process_diagnostics(self, src, dest, name):
         with h5py.File(src, "r") as f:
             images = f["entry/data/data"][()]
+            # in rare cases we observe broken images that show vertical stripes with values of 2**16-1 = 65535
+            # if we find an image like that, we just drop the entire batch of images
+            # specifically we check the 150th column of all the images and check how often we find the value 65535
+            # if it occurs more than 3 times, we drop the file
+            if np.sum((images[:, :, 150] * self.mask[:, 150]) == 65535) > 3:
+                warnings.warn(
+                    f"found broken image in: {src}; skipping..."
+                )
+                return
+
             # look at the intensity sum in the first images and compare them; darks will be dark...
             if self.n_imgs > 100:
                 sum_1 = np.sum(images[:100:2])
@@ -169,6 +183,16 @@ class SingleShotProcessor(ThreadPoolExecutor):
     def __process_pump_probe(self, src, dest):
         with h5py.File(src, "r") as f:
             images = f["entry/data/data"][()]
+            # in rare cases we observe broken images that show vertical stripes with values of 2**16-1 = 65535
+            # if we find an image like that, we just drop the entire batch of images
+            # specifically we check the 150th column of all the images and check how often we find the value 65535
+            # if it occurs more than 3 times, we drop the file
+            if np.sum((images[:, :, 150] * self.mask[:, 150]) == 65535) > 3:
+                warnings.warn(
+                    f"found broken image in: {src}; skipping..."
+                )
+                return
+
             # look at the borders of the the 10th block of 100 images and compare them
             if self.n_imgs > 1000:
                 border_1 = np.sum(images[900:1000:2], axis=0)
