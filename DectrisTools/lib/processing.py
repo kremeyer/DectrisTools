@@ -169,7 +169,7 @@ class SingleShotProcessor(ThreadPoolExecutor):
                 confidence = sum_2 / np.max((sum_1, 1e-10))
                 if confidence < 2:
                     warnings.warn(
-                        f"low confidence in distnguishing darks: {src} frac={sum_1 / sum_2}",
+                        f"low confidence in distnguishing darks: {src} frac={sum_2 / sum_1}",
                         UndistinguishableWarning,
                     )
 
