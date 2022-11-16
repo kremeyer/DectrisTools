@@ -141,7 +141,8 @@ class SingleShotProcessor(ThreadPoolExecutor):
                 data_intensities = np.array([np.sum(img*self.mask) for img in images[::2]])  # using list to save memory
                 dark_mean = np.mean(images[1::2], axis=0)
                 dark_intensities = np.array([np.sum(img*self.mask) for img in images[1::2]])  # using list to save memory
-                if sum_1 / np.max((sum_2, 1e-10)) < 2:
+                confidence = sum_1 / np.max((sum_2, 1e-10))
+                if confidence < 2:
                     warnings.warn(
                         f"low confidence in distnguishing darks: {src} frac={sum_1 / sum_2}",
                         UndistinguishableWarning,
@@ -151,7 +152,8 @@ class SingleShotProcessor(ThreadPoolExecutor):
                 data_intensities = np.array([np.sum(img*self.mask) for img in images[1::2]])  # using list to save memory
                 dark_mean = np.mean(images[::2], axis=0)
                 dark_intensities = np.array([np.sum(img*self.mask) for img in images[::2]])  # using list to save memory
-                if sum_2 / np.max((sum_2, 1e-10)) < 2:
+                confidence = sum_2 / np.max((sum_1, 1e-10))
+                if confidence < 2:
                     warnings.warn(
                         f"low confidence in distnguishing darks: {src} frac={sum_1 / sum_2}",
                         UndistinguishableWarning,
@@ -162,6 +164,7 @@ class SingleShotProcessor(ThreadPoolExecutor):
             f.create_dataset('dark', data=dark_mean)
             f.create_dataset(f'{name}_sum_intensities', data=data_intensities)
             f.create_dataset("dark_sum_intensities", data=dark_intensities)
+            f.create_dataset("confidence", data=confidence)
 
     def __process_pump_probe(self, src, dest):
         with h5py.File(src, "r") as f:
@@ -220,7 +223,7 @@ class SingleShotDataset:
     log_delay_pattern = re.compile(r"time-delay -?\d*.?\d*ps")
     log_scan_pattern = re.compile(r"scan \d*")
 
-    def __init__(self, basedir, mask=None, normalize=True, progress=False, correct_dark=True, correct_laser=True, scans=slice(None)):
+    def __init__(self, basedir, mask=None, normalize=True, progress=False, correct_dark=False, correct_laser=False, scans=slice(None)):
         self.basedir = basedir
 
         if scans is not slice(None) and not isinstance(scans, slice):
