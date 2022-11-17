@@ -361,6 +361,18 @@ class SingleShotDataset:
         self.mean_img = np.mean(self.pump_on, axis=0)
         self.mean_diffimg = np.mean(self.diffdata, axis=0)
 
+    def save(self, filename):
+        with h5py.File(filename, 'w') as f:
+            f.create_dataset('time_points', data=self.delays)
+            f.create_dataset('valid_mask', data=self.mask)
+            proc_group = f.create_group('processed')
+            proc_group.create_dataset('equilibrium', data=np.mean(self.pump_off, axis=0))
+            proc_group.create_dataset('intensity', data=np.moveaxis(self.pump_on, 0, -1))
+            realtime_group = f.create_group('real_time')
+            realtime_group.create_dataset('minutes', data=[td.total_seconds()/60 for td in self.timedeltas])
+            realtime_group.create_dataset('intensity', data=self.real_time_intensities)
+            realtime_group.create_dataset('time_points', data=self.real_time_delays)
+
     @staticmethod
     def __str_to_datetime(s):
         return datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
