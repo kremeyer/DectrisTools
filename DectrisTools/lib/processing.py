@@ -55,9 +55,10 @@ class SingleShotProcessor(ThreadPoolExecutor):
 
     BORDERSIZE = 8
 
-    def __init__(self, filelist, mask=None, max_workers=None, ignore_existing=False):
+    def __init__(self, filelist, mask=None, max_workers=None, ignore_existing=False, discard_fist_last_img=True):
         self.filelist = filelist
         self.ignore_existing = ignore_existing
+        self.discard_fist_last_img = discard_fist_last_img
         self.sample_dataset = h5py.File(filelist[0], "r")["entry/data/data"]
         if max_workers is None:
             # determine max workers from free memory and size of dataset
@@ -132,7 +133,10 @@ class SingleShotProcessor(ThreadPoolExecutor):
 
     def __process_diagnostics(self, src, dest, name):
         with h5py.File(src, "r") as f:
-            images = f["entry/data/data"][()]
+            if self.discard_fist_last_img:
+                images = f["entry/data/data"][()][1:-1]
+            else:
+                images = f["entry/data/data"][()]
             # in rare cases we observe broken images that show vertical stripes with values of 2**16-1 = 65535
             # if we find an image like that, we just drop the entire batch of images
             # specifically we check the 150th column of all the images and check how often we find the value 65535
