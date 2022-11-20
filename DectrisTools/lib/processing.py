@@ -24,6 +24,10 @@ class UndistinguishableWarning(Warning):
     pass
 
 
+class BrokenImageWarning(Warning):
+    pass
+
+
 class SingleShotProcessor(ThreadPoolExecutor):
     """class to process hdf5 files from single shot experiments
     each hdf5 file will contain a series of images that are contain pump on/off data
@@ -49,11 +53,12 @@ class SingleShotProcessor(ThreadPoolExecutor):
     >>>        print(ssp[future])
     """
 
-    BORDERSIZE = 5
+    BORDERSIZE = 8
 
-    def __init__(self, filelist, mask=None, max_workers=None, ignore_existing=False):
+    def __init__(self, filelist, mask=None, max_workers=None, ignore_existing=False, discard_fist_last_img=True):
         self.filelist = filelist
         self.ignore_existing = ignore_existing
+        self.discard_fist_last_img = discard_fist_last_img
         self.sample_dataset = h5py.File(filelist[0], "r")["entry/data/data"]
         if max_workers is None:
             # determine max workers from free memory and size of dataset
@@ -78,10 +83,10 @@ class SingleShotProcessor(ThreadPoolExecutor):
         else:
             self.mask = mask
         self.n_imgs = self.sample_dataset.shape[0]
-        self.border_mask = np.ones(self.img_size).astype("bool")
+        self.border_mask = np.ones(self.img_size)
         self.border_mask[
             self.BORDERSIZE: -self.BORDERSIZE, self.BORDERSIZE: -self.BORDERSIZE
-        ] = False
+        ] = 0
         self.futures = {}
         super().__init__(max_workers=max_workers)
 
@@ -128,7 +133,20 @@ class SingleShotProcessor(ThreadPoolExecutor):
 
     def __process_diagnostics(self, src, dest, name):
         with h5py.File(src, "r") as f:
-            images = f["entry/data/data"][()]
+            if self.discard_fist_last_img:
+                images = f["entry/data/data"][()][1:-1]
+            else:
+                images = f["entry/data/data"][()]
+            # in rare cases we observe broken images that show vertical stripes with values of 2**16-1 = 65535
+            # if we find an image like that, we just drop the entire batch of images
+            # specifically we check the 150th column of all the images and check how often we find the value 65535
+            # if it occurs more than 3 times, we drop the file
+            if np.sum((images[:, :, 150] * self.mask[:, 150]) == 65535) > 3:
+                warnings.warn(
+                    f"found broken image in: {src}; skipping..."
+                )
+                return
+
             # look at the intensity sum in the first images and compare them; darks will be dark...
             if self.n_imgs > 100:
                 sum_1 = np.sum(images[:100:2])
@@ -141,9 +159,10 @@ class SingleShotProcessor(ThreadPoolExecutor):
                 data_intensities = np.array([np.sum(img*self.mask) for img in images[::2]])  # using list to save memory
                 dark_mean = np.mean(images[1::2], axis=0)
                 dark_intensities = np.array([np.sum(img*self.mask) for img in images[1::2]])  # using list to save memory
-                if sum_1 / np.max((sum_2, 1e-10)) < 100:
+                confidence = sum_1 / np.max((sum_2, 1e-10))
+                if confidence < 2:
                     warnings.warn(
-                        "low confidence in distnguishing pump on/off data",
+                        f"low confidence in distnguishing darks: {src} frac={sum_1 / sum_2}",
                         UndistinguishableWarning,
                     )
             else:
@@ -151,9 +170,10 @@ class SingleShotProcessor(ThreadPoolExecutor):
                 data_intensities = np.array([np.sum(img*self.mask) for img in images[1::2]])  # using list to save memory
                 dark_mean = np.mean(images[::2], axis=0)
                 dark_intensities = np.array([np.sum(img*self.mask) for img in images[::2]])  # using list to save memory
-                if sum_2 / np.max((sum_2, 1e-10)) < 100:
+                confidence = sum_2 / np.max((sum_1, 1e-10))
+                if confidence < 2:
                     warnings.warn(
-                        "low confidence in distnguishing pump on/off data",
+                        f"low confidence in distnguishing darks: {src} frac={sum_2 / sum_1}",
                         UndistinguishableWarning,
                     )
 
@@ -162,19 +182,30 @@ class SingleShotProcessor(ThreadPoolExecutor):
             f.create_dataset('dark', data=dark_mean)
             f.create_dataset(f'{name}_sum_intensities', data=data_intensities)
             f.create_dataset("dark_sum_intensities", data=dark_intensities)
+            f.create_dataset("confidence", data=confidence)
 
     def __process_pump_probe(self, src, dest):
         with h5py.File(src, "r") as f:
             images = f["entry/data/data"][()]
-            # look at the borders of the first 100 images and compare them
-            if self.n_imgs > 100:
-                border_1 = np.sum(images[:100:2], axis=0)
-                border_2 = np.sum(images[1:101:2], axis=0)
+            # in rare cases we observe broken images that show vertical stripes with values of 2**16-1 = 65535
+            # if we find an image like that, we just drop the entire batch of images
+            # specifically we check the 150th column of all the images and check how often we find the value 65535
+            # if it occurs more than 3 times, we drop the file
+            if np.sum((images[:, :, 150] * self.mask[:, 150]) == 65535) > 3:
+                warnings.warn(
+                    f"found broken image in: {src}; skipping..."
+                )
+                return
+
+            # look at the borders of the the 10th block of 100 images and compare them
+            if self.n_imgs > 1000:
+                border_1 = np.sum(images[900:1000:2], axis=0)
+                border_2 = np.sum(images[901:1001:2], axis=0)
             else:
                 border_1 = np.sum(images[::2], axis=0)
                 border_2 = np.sum(images[1::2], axis=0)
-            border_1 = np.sum(border_1[self.border_mask])
-            border_2 = np.sum(border_2[self.border_mask])
+            border_1 = np.sum(border_1 * self.border_mask)
+            border_2 = np.sum(border_2 * self.border_mask)
             if border_1 > border_2:
                 first_image_type = 'pump_on'
                 confidence = border_1 / np.max((border_2, 1e-10))
@@ -220,7 +251,7 @@ class SingleShotDataset:
     log_delay_pattern = re.compile(r"time-delay -?\d*.?\d*ps")
     log_scan_pattern = re.compile(r"scan \d*")
 
-    def __init__(self, basedir, mask=None, normalize=True, progress=False, correct_dark=True, correct_laser=True, scans=slice(None)):
+    def __init__(self, basedir, mask=None, normalize=True, progress=False, correct_dark=False, correct_laser=False, scans=slice(None)):
         self.basedir = basedir
 
         if scans is not slice(None) and not isinstance(scans, slice):
@@ -333,6 +364,18 @@ class SingleShotDataset:
         self.diffdata /= files_per_delay[:, None, None]
         self.mean_img = np.mean(self.pump_on, axis=0)
         self.mean_diffimg = np.mean(self.diffdata, axis=0)
+
+    def save(self, filename):
+        with h5py.File(filename, 'w') as f:
+            f.create_dataset('time_points', data=self.delays)
+            f.create_dataset('valid_mask', data=self.mask)
+            proc_group = f.create_group('processed')
+            proc_group.create_dataset('equilibrium', data=np.mean(self.pump_off, axis=0))
+            proc_group.create_dataset('intensity', data=np.moveaxis(self.pump_on, 0, -1))
+            realtime_group = f.create_group('real_time')
+            realtime_group.create_dataset('minutes', data=[td.total_seconds()/60 for td in self.timedeltas])
+            realtime_group.create_dataset('intensity', data=self.real_time_intensities)
+            realtime_group.create_dataset('time_points', data=self.real_time_delays)
 
     @staticmethod
     def __str_to_datetime(s):
