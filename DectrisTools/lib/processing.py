@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Thread
 from collections.abc import Iterable
 import warnings
-from os import path, listdir
+from os import path, listdir, remove
 from pathlib import Path
 import re
 from datetime import datetime
@@ -275,12 +275,16 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
 
     BORDERSIZE = 8
 
-    def __init__(self, filelist, dest_file, mask=None, max_workers=None, discard_fist_last_img=True):
+    def __init__(self, filelist, dest_file, mask=None, max_workers=None, discard_fist_last_img=True, tempfile=None):
         self.filelist = filelist
         if path.exists(dest_file):
             raise OSError(f"{dest_file} already exists")
         self.dest_file = dest_file
         self.discard_fist_last_img = discard_fist_last_img
+        if tempfile is None:
+            self.tempfile = Path(dest_file).stem + '_tmp.h5'
+        else:
+            self.tempfile = tempfile
         self.sample_dataset = h5py.File(filelist[0], "r")["entry/data/data"]
         if max_workers is None:
             # determine max workers from free memory and size of dataset
@@ -346,7 +350,19 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
 
     def shutdown(self, *args, **kwargs):
         super().shutdown(*args, **kwargs)
-        with h5py.File(self.dest_file, "w") as f:
+        self.__save(self.dest_file)
+
+    def __worker(self, filename):
+        if "pumpon" in filename:
+            self.__process_pump_probe(filename)
+        else:
+            raise NotImplementedError(f"don't know what to do with {filename}")
+
+    def __save(self, file, overwrite=False):
+        if overwrite:
+            if path.exists(file):
+                remove(file)
+        with h5py.File(file, "x") as f:
             pump_on_group = f.create_group('pump_on')
             pump_off_group = f.create_group('pump_off')
             f.create_dataset("confidence", data=self.confidence, **hdf5plugin.Bitshuffle())
@@ -357,14 +373,12 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
             pump_off_group.create_dataset("sum_intensities", data=self.sum_ints_pump_off, **hdf5plugin.Bitshuffle())
             pump_off_group.create_dataset("histogram", data=self.histogram_pump_off, **hdf5plugin.Bitshuffle())
 
-    def __worker(self, filename):
-        if "pumpon" in filename:
-            self.__process_pump_probe(filename)
-        else:
-            raise NotImplementedError(f"don't know what to do with {filename}")
+    def __tempsave(self):
+        self.__save(self.tempfile, overwrite=True)
 
     def __process_pump_probe(self, src):
         # TODO: normalization and sum ints with mask
+        # TODO: corrupted image detection
         with h5py.File(src, "r") as f:
             if self.n_imgs > 1000:
                 border_1 = np.sum(f["entry/data/data"][900:1000:2], axis=0)
@@ -372,10 +386,10 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
             else:
                 border_1 = np.sum(f["entry/data/data"][::2], axis=0)
                 border_2 = np.sum(f["entry/data/data"][1::2], axis=0)
-            # in rare cases we observe broken images that show vertical stripes with values of 2**16-1 = 65535
-            # if we find an image like that, we just drop the entire batch of images
-            # specifically we check the 150th column of all the images and check how often we find the value 65535
-            # if it occurs more than 3 times, we drop the file
+        # in rare cases we observe broken images that show vertical stripes with values of 2**16-1 = 65535
+        # if we find an image like that, we just drop the entire batch of images
+        # specifically we check the 150th column of all the images and check how often we find the value 65535
+        # if it occurs more than 3 times, we drop the file
         # if np.sum((images[:, :, 150] * self.mask[:, 150]) == 65535) > 3:
         #     warnings.warn(
         #         f"found broken image in: {src}; skipping..."
@@ -422,6 +436,8 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
         self.pump_off[delay_index] += np.sum(pump_off_images, axis=0)
         self.sum_ints_pump_off[sum_int_slice] = np.sum(pump_off_images, axis=(1, 2))
         self.histogram_pump_off[delay_index] += histogram1d(pump_off_images.ravel(), bins=2**16, range=(0, 2**16-1))
+
+        self.__tempsave()
 
     @staticmethod
     def __delay_from_fname(fname):
