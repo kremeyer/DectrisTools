@@ -346,16 +346,16 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
 
     def shutdown(self, *args, **kwargs):
         super().shutdown(*args, **kwargs)
-        # with h5py.File(self.dest_file, "w") as f:
-        #     pump_on_group = f.create_group('pump_on')
-        #     pump_off_group = f.create_group('pump_off')
-        #     f.create_dataset("confidence", data=self.confidence, **hdf5plugin.Bitshuffle())
-        #     pump_on_group.create_dataset("avg_intensities", data=self.pump_on, **hdf5plugin.Bitshuffle())
-        #     pump_on_group.create_dataset("sum_intensities", data=self.sum_ints_pump_on, **hdf5plugin.Bitshuffle())
-        #     pump_on_group.create_dataset("histogram", data=self.histogram_pump_on, **hdf5plugin.Bitshuffle())
-        #     pump_off_group.create_dataset("avg_intensities", data=self.pump_off, **hdf5plugin.Bitshuffle())
-        #     pump_off_group.create_dataset("sum_intensities", data=self.sum_ints_pump_off, **hdf5plugin.Bitshuffle())
-        #     pump_off_group.create_dataset("histogram", data=self.histogram_pump_off, **hdf5plugin.Bitshuffle())
+        with h5py.File(self.dest_file, "w") as f:
+            pump_on_group = f.create_group('pump_on')
+            pump_off_group = f.create_group('pump_off')
+            f.create_dataset("confidence", data=self.confidence, **hdf5plugin.Bitshuffle())
+            pump_on_group.create_dataset("avg_intensities", data=self.pump_on, **hdf5plugin.Bitshuffle())
+            pump_on_group.create_dataset("sum_intensities", data=self.sum_ints_pump_on, **hdf5plugin.Bitshuffle())
+            pump_on_group.create_dataset("histogram", data=self.histogram_pump_on, **hdf5plugin.Bitshuffle())
+            pump_off_group.create_dataset("avg_intensities", data=self.pump_off, **hdf5plugin.Bitshuffle())
+            pump_off_group.create_dataset("sum_intensities", data=self.sum_ints_pump_off, **hdf5plugin.Bitshuffle())
+            pump_off_group.create_dataset("histogram", data=self.histogram_pump_off, **hdf5plugin.Bitshuffle())
 
     def __worker(self, filename):
         if "pumpon" in filename:
@@ -364,6 +364,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
             raise NotImplementedError(f"don't know what to do with {filename}")
 
     def __process_pump_probe(self, src):
+        # TODO: normalization and sum ints with mask
         with h5py.File(src, "r") as f:
             if self.n_imgs > 1000:
                 border_1 = np.sum(f["entry/data/data"][900:1000:2], axis=0)
