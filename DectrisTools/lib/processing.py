@@ -337,6 +337,9 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
             if future.exception():
                 raise future.exception()
 
+    def submit(self, filename):
+        return super().submit(self.__worker, filename)
+
     def start(self):
         self.futures = {self.submit(fname): fname for fname in self.filelist}
         self.watch()
