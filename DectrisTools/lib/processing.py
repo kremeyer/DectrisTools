@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Thread
 from collections.abc import Iterable
 import warnings
-from os import path, listdir
+from os import path, listdir, remove
 from pathlib import Path
 import re
 from datetime import datetime
@@ -14,6 +14,7 @@ import numpy as np
 import hdf5plugin
 import h5py
 from tqdm import tqdm
+from fast_histogram import histogram1d
 
 
 class AlreadyProcessedWarning(Warning):
@@ -186,7 +187,10 @@ class SingleShotProcessor(ThreadPoolExecutor):
 
     def __process_pump_probe(self, src, dest):
         with h5py.File(src, "r") as f:
-            images = f["entry/data/data"][()]
+            if self.discard_fist_last_img:
+                images = f["entry/data/data"][()][1:-1]
+            else:
+                images = f["entry/data/data"][()]
             # in rare cases we observe broken images that show vertical stripes with values of 2**16-1 = 65535
             # if we find an image like that, we just drop the entire batch of images
             # specifically we check the 150th column of all the images and check how often we find the value 65535
@@ -242,6 +246,202 @@ class SingleShotProcessor(ThreadPoolExecutor):
             )
             f.create_dataset("confidence", data=confidence)
             f.create_dataset("first_image_type", data=first_image_type)
+
+
+class SingleShotProcessorGen2(ThreadPoolExecutor):
+    """class to process hdf5 files from single shot experiments
+    no dark subtraction; no laser bg subtraction
+    the whole dataset will be saved into a single hdf5 file with the following structure
+    N - images per file; F - number of files to process
+    /                         Group
+    /confidence               Dataset {F} -> confidence that pump on/off is correctly identified
+    /pump_on                  Dataset {delays, image_x, image_y} -> pump on data
+    /pump_off                 Dataset {delays, image_x, image_y} -> pump off data
+    /sum_ints_pump_on         Dataset {F*N/2} -> sum intensity of every pump on image
+    /sum_ints_pump_off        Dataset {F*N/2} -> sum intensity of every pump off image
+    /histogram_pump_on        Dataset {delays, 2^16} -> histogram of pixel intensities in pump on images
+    /histogram_pump_off       Dataset {delays, 2^16} -> histogram of pixel intensities in pump off images
+
+    Example:
+    >>>from pathlib import Path
+    >>>from concurrent.futures import as_completed
+
+    >>>rundir = "/data/TiSe2_run_0010"
+    >>>with SingleShotProcessorGen2([str(p) for p in Path(rundir).rglob("*ps.h5")], max_workers=1) as ssp:
+    >>>    ssp.start()
+    >>>    for future in as_completed(ssp.futures):
+    >>>        print(ssp[future])
+    """
+
+    BORDERSIZE = 8
+
+    def __init__(self, filelist, dest_file, mask=None, max_workers=None, discard_fist_last_img=True, tempfile=None):
+        self.filelist = filelist
+        if path.exists(dest_file):
+            raise OSError(f"{dest_file} already exists")
+        self.dest_file = dest_file
+        self.discard_fist_last_img = discard_fist_last_img
+        if tempfile is None:
+            self.tempfile = Path(dest_file).stem + '_tmp.h5'
+        else:
+            self.tempfile = tempfile
+        self.sample_dataset = h5py.File(filelist[0], "r")["entry/data/data"]
+        if max_workers is None:
+            # determine max workers from free memory and size of dataset
+            free_memory = virtual_memory().available
+            datasets_in_memory = int(
+                free_memory
+                / (
+                    self.sample_dataset.dtype.itemsize
+                    * np.prod(self.sample_dataset.shape)
+                )
+            )
+            if datasets_in_memory == 0:
+                warnings.warn(
+                    "you might want to free up some system memory; you can't fit a whole dataset into it",
+                    ResourceWarning,
+                )
+                datasets_in_memory = 1
+            max_workers = datasets_in_memory
+        self.img_size = self.sample_dataset.shape[1:]
+        self.delays = np.array(
+            sorted(set([self.__delay_from_fname(fname) for fname in self.filelist]))
+        )
+        if mask is None:
+            self.mask = np.ones(self.img_size)
+        else:
+            self.mask = mask
+        self.n_imgs = self.sample_dataset.shape[0]
+        if discard_fist_last_img:
+            self.n_imgs -= 2
+        self.border_mask = np.ones(self.img_size)
+        self.border_mask[
+            self.BORDERSIZE: -self.BORDERSIZE, self.BORDERSIZE: -self.BORDERSIZE
+        ] = 0
+        self.confidence = np.zeros(len(filelist))
+        self.pump_on = np.zeros((len(self.delays), self.img_size[0], self.img_size[1]))
+        self.pump_off = np.zeros((len(self.delays), self.img_size[0], self.img_size[1]))
+        self.sum_ints_pump_on = np.zeros((int(len(filelist) * self.n_imgs / 2)))
+        self.sum_ints_pump_off = np.zeros((int(len(filelist) * self.n_imgs / 2)))
+        self.histogram_pump_on = np.zeros((len(self.delays), 2**16))
+        self.histogram_pump_off = np.zeros((len(self.delays), 2**16))
+        self.files_per_delay = np.zeros(len(self.delays))
+
+        self.futures = {}
+        super().__init__(max_workers=max_workers)
+
+    def __getitem__(self, key):
+        return self.futures[key]
+
+    def watch(self):
+        Thread(target=self.__watch).start()
+
+    def __watch(self):
+        for future in as_completed(self.futures):
+            if future.exception():
+                raise future.exception()
+
+    def submit(self, filename):
+        return super().submit(self.__worker, filename)
+
+    def start(self):
+        self.futures = {self.submit(fname): fname for fname in self.filelist}
+        self.watch()
+
+    def shutdown(self, *args, **kwargs):
+        super().shutdown(*args, **kwargs)
+        self.__save(self.dest_file)
+
+    def __worker(self, filename):
+        if "pumpon" in filename:
+            self.__process_pump_probe(filename)
+        else:
+            raise NotImplementedError(f"don't know what to do with {filename}")
+
+    def __save(self, file, overwrite=False):
+        if overwrite:
+            if path.exists(file):
+                remove(file)
+        with h5py.File(file, "x") as f:
+            pump_on_group = f.create_group('pump_on')
+            pump_off_group = f.create_group('pump_off')
+            f.create_dataset("confidence", data=self.confidence, **hdf5plugin.Bitshuffle())
+            pump_on_group.create_dataset("avg_intensities", data=self.pump_on, **hdf5plugin.Bitshuffle())
+            pump_on_group.create_dataset("sum_intensities", data=self.sum_ints_pump_on, **hdf5plugin.Bitshuffle())
+            pump_on_group.create_dataset("histogram", data=self.histogram_pump_on, **hdf5plugin.Bitshuffle())
+            pump_off_group.create_dataset("avg_intensities", data=self.pump_off, **hdf5plugin.Bitshuffle())
+            pump_off_group.create_dataset("sum_intensities", data=self.sum_ints_pump_off, **hdf5plugin.Bitshuffle())
+            pump_off_group.create_dataset("histogram", data=self.histogram_pump_off, **hdf5plugin.Bitshuffle())
+
+    def __tempsave(self):
+        self.__save(self.tempfile, overwrite=True)
+
+    def __process_pump_probe(self, src):
+        # TODO: normalization and sum ints with mask
+        # TODO: corrupted image detection
+        with h5py.File(src, "r") as f:
+            if self.n_imgs > 1000:
+                border_1 = np.sum(f["entry/data/data"][900:1000:2], axis=0)
+                border_2 = np.sum(f["entry/data/data"][901:1001:2], axis=0)
+            else:
+                border_1 = np.sum(f["entry/data/data"][::2], axis=0)
+                border_2 = np.sum(f["entry/data/data"][1::2], axis=0)
+        # in rare cases we observe broken images that show vertical stripes with values of 2**16-1 = 65535
+        # if we find an image like that, we just drop the entire batch of images
+        # specifically we check the 150th column of all the images and check how often we find the value 65535
+        # if it occurs more than 3 times, we drop the file
+        # if np.sum((images[:, :, 150] * self.mask[:, 150]) == 65535) > 3:
+        #     warnings.warn(
+        #         f"found broken image in: {src}; skipping..."
+        #     )
+        #     return
+        # look at the borders of the the 10th block of 100 images and compare them
+        border_1 = np.sum(border_1 * self.border_mask)
+        border_2 = np.sum(border_2 * self.border_mask)
+        if border_1 > border_2:
+            confidence = border_1 / np.max((border_2, 1e-10))
+            if self.discard_fist_last_img:
+                pump_on_slice = slice(2, -1, 2)
+                pump_off_slice = slice(1, -2, 2)
+            else:
+                pump_on_slice = slice(0, None, 2)
+                pump_off_slice = slice(1, None, 2)
+        else:
+            confidence = border_2 / np.max((border_1, 1e-10))
+            if self.discard_fist_last_img:
+                pump_on_slice = slice(1, -2, 2)
+                pump_off_slice = slice(2, -1, 2)
+            else:
+                pump_on_slice = slice(1, None, 2)
+                pump_off_slice = slice(0, None, 2)
+        if confidence < 100:
+            warnings.warn(
+                f"low confidence in distinguishing pump on/off: {src} frac={border_1 / border_2}",
+                UndistinguishableWarning,
+            )
+        file_index = self.filelist.index(src)
+        delay_index = np.where(self.delays == self.__delay_from_fname(src))[0][0]
+        sum_int_slice = slice(int(file_index * self.n_imgs / 2), int((file_index + 1) * self.n_imgs / 2))
+        self.files_per_delay[delay_index] += 1
+        self.confidence[file_index] = confidence
+
+        with h5py.File(src, "r") as f:
+            pump_on_images = f["entry/data/data"][pump_on_slice]
+        self.pump_on[delay_index] += np.sum(pump_on_images, axis=0)
+        self.sum_ints_pump_on[sum_int_slice] = np.sum(pump_on_images, axis=(1, 2))
+        self.histogram_pump_on[delay_index] += histogram1d(pump_on_images.ravel(), bins=2**16, range=(0, 2**16-1))
+
+        with h5py.File(src, "r") as f:
+            pump_off_images = f["entry/data/data"][pump_off_slice]
+        self.pump_off[delay_index] += np.sum(pump_off_images, axis=0)
+        self.sum_ints_pump_off[sum_int_slice] = np.sum(pump_off_images, axis=(1, 2))
+        self.histogram_pump_off[delay_index] += histogram1d(pump_off_images.ravel(), bins=2**16, range=(0, 2**16-1))
+
+        self.__tempsave()
+
+    @staticmethod
+    def __delay_from_fname(fname):
+        return float(fname.split(r"/")[-1][7:17])
 
 
 class SingleShotDataset:
