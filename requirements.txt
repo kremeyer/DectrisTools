@@ -8,3 +8,4 @@ tqdm~=4.63
 hdf5plugin~=3.3.1
 h5py~=3.7.0
 psutil~=5.9.1
+fast-histogram~=0.11
