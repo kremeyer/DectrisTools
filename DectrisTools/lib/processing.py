@@ -358,7 +358,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
         else:
             raise NotImplementedError(f"don't know what to do with {filename}")
 
-    def __save(self, file, overwrite=False):
+    def __save(self, file, overwrite=False, **kwargs):
         if overwrite:
             if path.exists(file):
                 remove(file)
@@ -372,9 +372,11 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
             pump_off_group.create_dataset("avg_intensities", data=self.pump_off, **hdf5plugin.Bitshuffle())
             pump_off_group.create_dataset("sum_intensities", data=self.sum_ints_pump_off, **hdf5plugin.Bitshuffle())
             pump_off_group.create_dataset("histogram", data=self.histogram_pump_off, **hdf5plugin.Bitshuffle())
+            for key, val in kwargs.items():
+                f.create_dataset(key, data=val)
 
-    def __tempsave(self):
-        self.__save(self.tempfile, overwrite=True)
+    def __tempsave(self, **kwargs):
+        self.__save(self.tempfile, overwrite=True, **kwargs)
 
     def __process_pump_probe(self, src):
         # TODO: normalization and sum ints with mask
@@ -437,7 +439,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
         self.sum_ints_pump_off[sum_int_slice] = np.sum(pump_off_images, axis=(1, 2))
         self.histogram_pump_off[delay_index] += histogram1d(pump_off_images.ravel(), bins=2**16, range=(0, 2**16-1))
 
-        self.__tempsave()
+        self.__tempsave(progress=file_index/len(self.filelist))
 
     @staticmethod
     def __delay_from_fname(fname):
