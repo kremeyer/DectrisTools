@@ -46,7 +46,9 @@ def parse_args():
     parser.add_argument("--savedir", type=str, help="save directory")
     parser.add_argument("--n_scans", type=int, help="number of scans")
     parser.add_argument("--delays", type=str)
-    parser.add_argument("--exposure", type=float, default=30, help="exposure time of each image")
+    parser.add_argument(
+        "--exposure", type=float, default=30, help="exposure time of each image"
+    )
     args = parser.parse_args()
     return args
 

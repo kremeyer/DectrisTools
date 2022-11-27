@@ -49,7 +49,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.update_interval = cmd_args.update_interval
 
         self.lineEditExposure = QtWidgets.QLineEdit()
-        self.lineEditExposure.setText('300')
+        self.lineEditExposure.setText("300")
         self.dectris_image_grabber = DectrisImageGrabber(
             cmd_args.ip,
             cmd_args.port,
@@ -133,9 +133,11 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.labelStop.setText("🛑")
 
         self.labelIntensity.setText(f'({"":>4s}, {"":>4s})   {"":>{self.i_digits}s}')
-        self.labelExposureUser.setText('Exposure [ms]')
+        self.labelExposureUser.setText("Exposure [ms]")
         fake_spacer = QtWidgets.QLabel()  # status bar does not accect QSpacerItem
-        fake_spacer.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        fake_spacer.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
         self.lineEditExposure.setMaximumSize(90, 100)
 
         self.statusbar.addPermanentWidget(self.labelExposureUser)

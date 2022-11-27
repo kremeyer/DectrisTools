@@ -12,6 +12,7 @@ setup(
         "PyQt5",
         "pillow",
         "tqdm",
+        "fast-histogram"
         "uedinst@git+https://github.com/Siwick-Research-Group/uedinst.git",
     ],
     url="https://github.com/kremeyer/DectrisTools",
