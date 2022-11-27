@@ -487,7 +487,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
         with h5py.File(src, "r") as f:
             pump_off_images = f["entry/data/data"][pump_off_slice]
         if self.__check_image_integrity(pump_off_images):
-            norm_values = np.sum(pump_on_images * self.mask, axis=(1, 2))
+            norm_values = np.sum(pump_off_images * self.mask, axis=(1, 2))
             self.pump_off[delay_index] += np.sum(
                 pump_off_images / norm_values[:, None, None], axis=0
             )
