@@ -15,3 +15,8 @@ run with `python -m DectrisTools.[module]`
 * `snapshot`: save the next image that will be recorded as an HDF5-file
 * `single_shot_experiment`: start a single shot pump on/off experiment
 * `process_single_shot`: process and reduce the raw data that you took with `single_shot_experiment`
+
+### caveats
+
+when building the fast-histogram dependency fails on one of computecanada's machines, try using `gcc >= 11.3.0` by running `module load gcc/11.3
+` before installing the package
