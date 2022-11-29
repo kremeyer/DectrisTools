@@ -14,7 +14,49 @@ import numpy as np
 import hdf5plugin
 import h5py
 from tqdm import tqdm
-from fast_histogram import histogram1d
+from numba import jit, prange
+
+
+@jit(nopython=True)
+def masked_sum(images, mask):
+    n_imgs = images.shape[0]
+    ret = np.empty(n_imgs)
+    for i in prange(n_imgs):
+        ret[i] = np.sum(images[i] * mask)
+    return ret
+
+
+@jit(nopython=True)
+def masked_ravel(images, mask):
+    n_imgs = images.shape[0]
+    n_pix = np.sum(mask)
+    ret = np.zeros(n_pix * n_imgs)
+    for i in prange(n_imgs):
+        ret[i * n_pix:(i + 1) * n_pix] = (images[i] * mask).ravel()
+    return ret
+
+
+@jit(nopython=True)
+def normed_sum(images, norm_values):
+    n_imgs = images.shape[0]
+    ret = np.zeros(images[0].shape)
+    for i in range(n_imgs):
+        ret += images[i] / norm_values[i]
+    return ret
+
+
+@jit(nopython=True)
+def masked_histogram(images, mask):
+    bins = np.zeros(2**16, dtype=np.uint32)
+    n_imgs = images.shape[0]
+    n_pix_masked = (mask.shape[0] * mask.shape[1]) - np.sum(mask)
+    for i in range(n_imgs):
+        image = images[i] * mask
+        for j in range(images.shape[1]):
+            for k in range(images.shape[2]):
+                bins[image[j, k]] += 1
+    bins[0] -= n_imgs * n_pix_masked  # subtract masked pixels that have been counted
+    return bins
 
 
 class AlreadyProcessedWarning(Warning):
@@ -427,6 +469,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
         self.__save(self.tempfile, overwrite=True, **kwargs)
 
     def __process_pump_probe(self, src):
+        # TODO: add option for more rois (masks)
         with h5py.File(src, "r") as f:
             if self.n_imgs > 1000:
                 border_1 = np.sum(f["entry/data/data"][900:1000:2], axis=0)
@@ -466,19 +509,15 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
         self.files_per_delay[delay_index] += 1
         self.confidence[file_index] = confidence
 
+        # for i in range(int(self.n_imgs/2/1_000)):
+        #     print(i)
         with h5py.File(src, "r") as f:
             pump_on_images = f["entry/data/data"][pump_on_slice]
         if self.__check_image_integrity(pump_on_images):
-            norm_values = np.sum(pump_on_images * self.mask, axis=(1, 2))
-            self.pump_on[delay_index] += np.sum(
-                pump_on_images / norm_values[:, None, None], axis=0
-            )
+            norm_values = masked_sum(pump_on_images, self.mask)
+            self.pump_on[delay_index] += normed_sum(pump_on_images, norm_values)
             self.sum_ints_pump_on[sum_int_slice] = norm_values
-            self.histogram_pump_on[delay_index] += histogram1d(
-                (pump_on_images * self.mask).ravel(),
-                bins=2**16,
-                range=(0, 2**16 - 1),
-            )
+            self.histogram_pump_on[delay_index] += masked_histogram(pump_on_images, self.mask)
         else:
             self.sum_ints_pump_on[sum_int_slice] = np.NaN
             warnings.warn(f"found broken image in {src}; skipping...")
@@ -487,16 +526,10 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
         with h5py.File(src, "r") as f:
             pump_off_images = f["entry/data/data"][pump_off_slice]
         if self.__check_image_integrity(pump_off_images):
-            norm_values = np.sum(pump_off_images * self.mask, axis=(1, 2))
-            self.pump_off[delay_index] += np.sum(
-                pump_off_images / norm_values[:, None, None], axis=0
-            )
+            norm_values = masked_sum(pump_off_images, self.mask)
+            self.pump_off[delay_index] += normed_sum(pump_off_images, norm_values)
             self.sum_ints_pump_off[sum_int_slice] = norm_values
-            self.histogram_pump_off[delay_index] += histogram1d(
-                (pump_off_images * self.mask).ravel(),
-                bins=2**16,
-                range=(0, 2**16 - 1),
-            )
+            self.histogram_pump_off[delay_index] += masked_histogram(pump_off_images, self.mask)
         else:
             self.sum_ints_pump_off[sum_int_slice] = np.NaN
             warnings.warn(f"found broken image in {src}; skipping...")
