@@ -15,6 +15,7 @@ setup(
         "pillow",
         "tqdm",
         "numba",
+        "psutil",
         "uedinst@git+https://github.com/Siwick-Research-Group/uedinst.git",
     ],
     url="https://github.com/kremeyer/DectrisTools",
