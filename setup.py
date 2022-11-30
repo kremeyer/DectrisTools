@@ -1,10 +1,12 @@
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, Extension
+from os.path import join
 from DectrisTools import VERSION
 
 setup(
     name="DectrisTools",
     version=VERSION,
     packages=find_packages(),
+    ext_modules=[Extension(name="DectrisTools.lib.computation", sources=[join("DectrisTools", "lib", "computation.c")])],
     include_package_data=True,
     install_requires=[
         "numpy",
