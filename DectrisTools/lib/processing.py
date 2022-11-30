@@ -27,6 +27,15 @@ def masked_sum(images, mask):
 
 
 @jit(nopython=True)
+def indexed_masked_sum(images, slices, mask):
+    n_imgs = images.shape[0]
+    ret = np.empty(n_imgs)
+    for i in prange(n_imgs):
+        ret[i] = np.sum(images[i, slices[0], slices[1]] * mask[slices[0], slices[1]])
+    return ret
+
+
+@jit(nopython=True)
 def masked_ravel(images, mask):
     n_imgs = images.shape[0]
     n_pix = np.sum(mask)
@@ -348,6 +357,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
         max_workers=None,
         discard_fist_last_img=True,
         tempfile=None,
+        rois={},
     ):
         self.filelist = filelist
         if path.exists(dest_file):
@@ -384,6 +394,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
             self.mask = np.ones(self.img_size)
         else:
             self.mask = mask
+        self.rois = rois
         self.n_imgs = self.sample_dataset.shape[0]
         if discard_fist_last_img:
             self.n_imgs -= 2
@@ -399,6 +410,11 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
         self.histogram_pump_on = np.zeros((len(self.delays), 2**16))
         self.histogram_pump_off = np.zeros((len(self.delays), 2**16))
         self.files_per_delay = np.zeros(len(self.delays))
+        self.sum_ints_rois_pump_on = {}
+        self.sum_ints_rois_pump_off = {}
+        for key in self.rois:
+            self.sum_ints_rois_pump_on[key] = np.zeros((int(len(filelist) * self.n_imgs / 2)))
+            self.sum_ints_rois_pump_off[key] = np.zeros((int(len(filelist) * self.n_imgs / 2)))
 
         self.futures = {}
         super().__init__(max_workers=max_workers)
@@ -462,6 +478,13 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
             pump_off_group.create_dataset(
                 "histogram", data=self.histogram_pump_off, **hdf5plugin.Bitshuffle()
             )
+            if self.rois:
+                roi_pump_on_group = pump_on_group.create_group("rois")
+                roi_pump_off_group = pump_off_group.create_group("rois")
+                for key, val in self.sum_ints_rois_pump_on.items():
+                    roi_pump_on_group.create_dataset(key, data=val, **hdf5plugin.Bitshuffle())
+                for key, val in self.sum_ints_rois_pump_off.items():
+                    roi_pump_off_group.create_dataset(key, data=val, **hdf5plugin.Bitshuffle())
             for key, val in kwargs.items():
                 f.create_dataset(key, data=val)
 
@@ -469,7 +492,6 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
         self.__save(self.tempfile, overwrite=True, **kwargs)
 
     def __process_pump_probe(self, src):
-        # TODO: add option for more rois (masks)
         with h5py.File(src, "r") as f:
             if self.n_imgs > 1000:
                 border_1 = np.sum(f["entry/data/data"][900:1000:2], axis=0)
@@ -509,8 +531,6 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
         self.files_per_delay[delay_index] += 1
         self.confidence[file_index] = confidence
 
-        # for i in range(int(self.n_imgs/2/1_000)):
-        #     print(i)
         with h5py.File(src, "r") as f:
             pump_on_images = f["entry/data/data"][pump_on_slice]
         if self.__check_image_integrity(pump_on_images):
@@ -518,8 +538,12 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
             self.pump_on[delay_index] += normed_sum(pump_on_images, norm_values)
             self.sum_ints_pump_on[sum_int_slice] = norm_values
             self.histogram_pump_on[delay_index] += masked_histogram(pump_on_images, self.mask)
+            for key, slices in self.rois.items():
+                self.sum_ints_rois_pump_on[key][sum_int_slice] = indexed_masked_sum(pump_on_images, slices, self.mask)
         else:
             self.sum_ints_pump_on[sum_int_slice] = np.NaN
+            for key in self.rois:
+                self.sum_ints_rois_pump_on[key][sum_int_slice] = np.NaN
             warnings.warn(f"found broken image in {src}; skipping...")
         del pump_on_images
 
@@ -530,8 +554,12 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
             self.pump_off[delay_index] += normed_sum(pump_off_images, norm_values)
             self.sum_ints_pump_off[sum_int_slice] = norm_values
             self.histogram_pump_off[delay_index] += masked_histogram(pump_off_images, self.mask)
+            for key, slices in self.rois.items():
+                self.sum_ints_rois_pump_off[key][sum_int_slice] = indexed_masked_sum(pump_off_images, slices, self.mask)
         else:
             self.sum_ints_pump_off[sum_int_slice] = np.NaN
+            for key in self.rois:
+                self.sum_ints_rois_pump_off[key][sum_int_slice] = np.NaN
             warnings.warn(f"found broken image in {src}; skipping...")
 
         self.__tempsave(progress=file_index / len(self.filelist))
