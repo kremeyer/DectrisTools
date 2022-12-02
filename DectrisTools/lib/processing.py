@@ -15,15 +15,7 @@ import hdf5plugin
 import h5py
 from tqdm import tqdm
 from numba import jit, prange
-
-
-@jit(nopython=True)
-def masked_sum(images, mask):
-    n_imgs = images.shape[0]
-    ret = np.empty(n_imgs)
-    for i in prange(n_imgs):
-        ret[i] = np.sum(images[i] * mask)
-    return ret
+from .computation import masked_sum
 
 
 @jit(nopython=True)
@@ -56,7 +48,7 @@ def normed_sum(images, norm_values):
 
 @jit(nopython=True)
 def masked_histogram(images, mask):
-    bins = np.zeros(2**16, dtype=np.uint32)
+    bins = np.zeros(2**16, dtype=np.uint64)
     n_imgs = images.shape[0]
     n_pix_masked = (mask.shape[0] * mask.shape[1]) - np.sum(mask)
     for i in range(n_imgs):
@@ -138,11 +130,11 @@ class SingleShotProcessor(ThreadPoolExecutor):
             max_workers = datasets_in_memory
         self.img_size = self.sample_dataset.shape[1:]
         if mask is None:
-            self.mask = np.ones(self.img_size)
+            self.mask = np.ones(self.img_size).astype(np.uint16)
         else:
-            self.mask = mask
+            self.mask = mask.astype(np.uint16)
         self.n_imgs = self.sample_dataset.shape[0]
-        self.border_mask = np.ones(self.img_size)
+        self.border_mask = np.ones(self.img_size).astype(np.uint16)
         self.border_mask[
             self.BORDERSIZE : -self.BORDERSIZE, self.BORDERSIZE : -self.BORDERSIZE
         ] = 0
@@ -391,14 +383,14 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
             sorted(set([self.__delay_from_fname(fname) for fname in self.filelist]))
         )
         if mask is None:
-            self.mask = np.ones(self.img_size)
+            self.mask = np.ones(self.img_size).astype(np.uint16)
         else:
-            self.mask = mask
+            self.mask = mask.astype(np.uint16)
         self.rois = rois
         self.n_imgs = self.sample_dataset.shape[0]
         if discard_fist_last_img:
             self.n_imgs -= 2
-        self.border_mask = np.ones(self.img_size)
+        self.border_mask = np.ones(self.img_size).astype(np.uint16)
         self.border_mask[
             self.BORDERSIZE : -self.BORDERSIZE, self.BORDERSIZE : -self.BORDERSIZE
         ] = 0
