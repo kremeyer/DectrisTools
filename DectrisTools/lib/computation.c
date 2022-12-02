@@ -1,52 +1,96 @@
 #define PY_SSIZE_T_CLEAN
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+
 #include <Python.h>
 #include <numpy/arrayobject.h>
 
+/* docstring definitions */
+static char module_docstring[] =
+    "fast and memory efficient array manipulation for diffraction data processing";
+static char masked_sum_docstring[] =
+    "compute the sums along axis 1 and 2 in a 3d array; a mask is applied before summation";
+
+/* function declarations */
+static PyObject *masked_sum (PyObject * self, PyObject * args);
+
+/* module method definitions */
+static PyMethodDef ComputationMethods[] = {
+    {"masked_sum", masked_sum, METH_VARARGS, masked_sum_docstring},
+    {NULL, NULL, 0, NULL},
+};
+
+/* module definition to be passed to the interpreter by the initialization function */
+static struct PyModuleDef computation = {
+    PyModuleDef_HEAD_INIT,
+    "computation",
+    module_docstring,
+    -1,
+    ComputationMethods
+};
+
+/* initialization function that passes the module definition to the interpreter */
+PyMODINIT_FUNC
+PyInit_computation (void)
+{
+    PyObject *m;
+    m = PyModule_Create (&computation);
+    import_array ();
+    return m;
+}
+
+
+/**************************************/
+/*  ACTUAL FUNCTIONALITY STARTS HERE  */
+/**************************************/
 
 static PyObject *
 masked_sum (PyObject * self, PyObject * args)
 {
     PyObject *sum_obj;
-    PyArrayObject *sum_array;
+    PyArrayObject *sum_npyarray;
     PyObject *images_obj, *mask_obj;
-    PyArrayObject *images_array, *mask_array;
+    PyArrayObject *images_npyarray, *mask_npyarray;
+    npy_intp *images_shape;
+    npy_intp *mask_shape;
+    uint16_t ***images, **mask;
+    uint64_t *sum;
 
+    /* parse input objects, check dimensions and data types */
     if (!PyArg_ParseTuple (args, "OO", &images_obj, &mask_obj))
 	{
 	    PyErr_SetString (PyExc_TypeError, "error parsing input");
 	    return NULL;
 	}
 
-    images_array = (PyArrayObject *) PyArray_FROM_O (images_obj);
-    if (PyArray_NDIM (images_array) != 3)
+    images_npyarray = (PyArrayObject *) PyArray_FROM_O (images_obj);
+    if (PyArray_NDIM (images_npyarray) != 3)
 	{
 	    PyErr_SetString (PyExc_IndexError,
 			     "expected ndim=3 images array");
 	    return NULL;
 	}
-    if (PyArray_TYPE (images_array) != NPY_UINT16)
+    if (PyArray_TYPE (images_npyarray) != NPY_UINT16)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "expected uint16 images array");
 	    return NULL;
 	}
-    npy_intp *images_shape = PyArray_SHAPE (images_array);
 
-    mask_array = (PyArrayObject *) PyArray_FROM_O (mask_obj);
-    if (PyArray_NDIM (mask_array) != 2)
+    mask_npyarray = (PyArrayObject *) PyArray_FROM_O (mask_obj);
+    if (PyArray_NDIM (mask_npyarray) != 2)
 	{
 	    PyErr_SetString (PyExc_IndexError, "expected ndim=2 mask array");
 	    return NULL;
 	}
-    if (PyArray_TYPE (mask_array) != NPY_UINT16)
+    if (PyArray_TYPE (mask_npyarray) != NPY_UINT16)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "expected uint16 mask array");
 	    return NULL;
 	}
-    npy_intp *mask_shape = PyArray_SHAPE (mask_array);
 
+    images_shape = PyArray_SHAPE (images_npyarray);
+    mask_shape = PyArray_SHAPE (mask_npyarray);
     if (images_shape[1] != mask_shape[0] || images_shape[2] != mask_shape[1])
 	{
 	    PyErr_SetString (PyExc_IndexError,
@@ -54,14 +98,15 @@ masked_sum (PyObject * self, PyObject * args)
 	    return NULL;
 	}
 
+    /* allocate memory for return array */
     sum_obj =
 	PyArray_Zeros (1, &images_shape[0],
 		       PyArray_DescrFromType (NPY_UINT64), 0);
-    sum_array = (PyArrayObject *) sum_obj;
+    sum_npyarray = (PyArrayObject *) sum_obj;
 
-    uint16_t ***images, **mask;
+    /* get pointers that simulate C-style array for easier iteration */
     if (PyArray_AsCArray
-	((PyObject **) & images_array, (void *) &images, images_shape, 3,
+	((PyObject **) & images_npyarray, (void *) &images, images_shape, 3,
 	 PyArray_DescrFromType (NPY_UINT16)) == -1)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
@@ -69,7 +114,7 @@ masked_sum (PyObject * self, PyObject * args)
 	    return NULL;
 	}
     if (PyArray_AsCArray
-	((PyObject **) & mask_array, (void *) &mask, mask_shape, 2,
+	((PyObject **) & mask_npyarray, (void *) &mask, mask_shape, 2,
 	 PyArray_DescrFromType (NPY_UINT16)) == -1)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
@@ -77,11 +122,10 @@ masked_sum (PyObject * self, PyObject * args)
 	    return NULL;
 	}
 
-    uint64_t *sum;
     npy_intp *n_imgs[1];
     n_imgs[0] = &images_shape[0];
     if (PyArray_AsCArray
-	((PyObject **) & sum_array, (void *) &sum, *n_imgs, 1,
+	((PyObject **) & sum_npyarray, (void *) &sum, *n_imgs, 1,
 	 PyArray_DescrFromType (NPY_UINT64)) == -1)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
@@ -89,8 +133,9 @@ masked_sum (PyObject * self, PyObject * args)
 	    return NULL;
 	}
 
-    Py_BEGIN_ALLOW_THREADS
+    Py_BEGIN_ALLOW_THREADS;
 
+    /* actual computation */
     for (int i = 0; i < images_shape[0]; i++)
 	{
 	    for (int j = 0; j < images_shape[1]; j++)
@@ -102,36 +147,14 @@ masked_sum (PyObject * self, PyObject * args)
 		}
 	}
 
-    Py_END_ALLOW_THREADS
+    Py_END_ALLOW_THREADS;
 
-    Py_DECREF(images_obj);
-    Py_DECREF(images_obj);
-    Py_DECREF(sum_obj);
-    Py_DECREF(mask_obj);
-    Py_DECREF(mask_obj);
+    /* keep track of the reference counting to make sure the python garbage collection can do it's thing */
+//    Py_DECREF (images_obj);
+//    Py_DECREF (images_obj);
+//    Py_DECREF (mask_obj);
+//    Py_DECREF (mask_obj);
+//    Py_DECREF (sum_obj);
 
     return sum_obj;
-}
-
-static PyMethodDef ComputationMethods[] = {
-    {"masked_sum", masked_sum, METH_VARARGS,
-     "Get sum of images along 2nd and 3rd axis with a mask applied to each image"},
-    {NULL, NULL, 0, NULL},
-};
-
-static struct PyModuleDef computation = {
-    PyModuleDef_HEAD_INIT,
-    "computation",
-    NULL,			// docstring
-    -1,
-    ComputationMethods
-};
-
-PyMODINIT_FUNC
-PyInit_computation (void)
-{
-    PyObject *m;
-    m = PyModule_Create (&computation);
-    import_array ();
-    return m;
 }

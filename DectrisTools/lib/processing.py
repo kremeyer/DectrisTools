@@ -46,7 +46,7 @@ def normed_sum(images, norm_values):
     return ret
 
 
-@jit(nopython=True)
+# @jit()
 def masked_histogram(images, mask):
     bins = np.zeros(2**16, dtype=np.uint64)
     n_imgs = images.shape[0]
@@ -440,6 +440,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
             raise NotImplementedError(f"don't know what to do with {filename}")
 
     def __save(self, file, overwrite=False, **kwargs):
+        return
         if overwrite:
             if path.exists(file):
                 remove(file)
@@ -529,6 +530,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
             norm_values = masked_sum(pump_on_images, self.mask)
             self.pump_on[delay_index] += normed_sum(pump_on_images, norm_values)
             self.sum_ints_pump_on[sum_int_slice] = norm_values
+            print(self.mask.shape)
             self.histogram_pump_on[delay_index] += masked_histogram(pump_on_images, self.mask)
             for key, slices in self.rois.items():
                 self.sum_ints_rois_pump_on[key][sum_int_slice] = indexed_masked_sum(pump_on_images, slices, self.mask)
@@ -545,6 +547,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
             norm_values = masked_sum(pump_off_images, self.mask)
             self.pump_off[delay_index] += normed_sum(pump_off_images, norm_values)
             self.sum_ints_pump_off[sum_int_slice] = norm_values
+            print(self.mask.shape)
             self.histogram_pump_off[delay_index] += masked_histogram(pump_off_images, self.mask)
             for key, slices in self.rois.items():
                 self.sum_ints_rois_pump_off[key][sum_int_slice] = indexed_masked_sum(pump_off_images, slices, self.mask)
