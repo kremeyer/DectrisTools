@@ -52,8 +52,8 @@ masked_sum (PyObject * self, PyObject * args)
     PyArrayObject *images_npyarray, *mask_npyarray;
     npy_intp *images_shape;
     npy_intp *mask_shape;
-    uint16_t ***images, **mask;
-    uint64_t *sum;
+    npy_uint16 ***images, **mask;
+    npy_uint64 *sum;
 
     /* parse input objects, check dimensions and data types */
     if (!PyArg_ParseTuple (args, "OO", &images_obj, &mask_obj))
@@ -133,7 +133,7 @@ masked_sum (PyObject * self, PyObject * args)
 	    return NULL;
 	}
 
-    Py_BEGIN_ALLOW_THREADS;
+//    Py_BEGIN_ALLOW_THREADS;
 
     /* actual computation */
     for (int i = 0; i < images_shape[0]; i++)
@@ -142,19 +142,23 @@ masked_sum (PyObject * self, PyObject * args)
 		{
 		    for (int k = 0; k < images_shape[2]; k++)
 			{
-			    sum[i] += images[i][j][k] * mask[j][k];
+			    sum[i] += images[i][j][k]; // * mask[j][k];
 			}
 		}
 	}
 
-    Py_END_ALLOW_THREADS;
+//    Py_END_ALLOW_THREADS;
 
     /* keep track of the reference counting to make sure the python garbage collection can do it's thing */
 //    Py_DECREF (images_obj);
+//    Py_DECREF (mask_obj);
+    PyArray_Free(images_obj, (void*)images);
+    PyArray_Free(mask_obj, (void*)mask);
+    PyArray_Free(sum_obj, sum);
 //    Py_DECREF (images_obj);
 //    Py_DECREF (mask_obj);
-//    Py_DECREF (mask_obj);
-//    Py_DECREF (sum_obj);
-
+//    free(images);
+//    free(mask);
+//    printf("%li %li\n", mask_shape[0], mask_shape[1]);
     return sum_obj;
 }

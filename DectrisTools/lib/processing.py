@@ -1,7 +1,9 @@
 """
 module for data processing tools
 """
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import os
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
+import sys
 from threading import Thread
 from collections.abc import Iterable
 import warnings
@@ -15,7 +17,16 @@ import hdf5plugin
 import h5py
 from tqdm import tqdm
 from numba import jit, prange
-from .computation import masked_sum
+# from .computation import masked_sum
+
+
+@jit(nopython=True)
+def masked_sum(images, mask):
+    n_imgs = images.shape[0]
+    ret = np.empty(n_imgs)
+    for i in prange(n_imgs):
+        ret[i] = np.sum(images[i] * mask)
+    return ret
 
 
 @jit(nopython=True)
@@ -46,7 +57,7 @@ def normed_sum(images, norm_values):
     return ret
 
 
-# @jit()
+@jit(nopython=True)
 def masked_histogram(images, mask):
     bins = np.zeros(2**16, dtype=np.uint64)
     n_imgs = images.shape[0]
@@ -105,11 +116,11 @@ class SingleShotProcessor(ThreadPoolExecutor):
         mask=None,
         max_workers=None,
         ignore_existing=False,
-        discard_fist_last_img=True,
+        discard_first_last_img=True,
     ):
         self.filelist = filelist
         self.ignore_existing = ignore_existing
-        self.discard_fist_last_img = discard_fist_last_img
+        self.discard_first_last_img = discard_first_last_img
         self.sample_dataset = h5py.File(filelist[0], "r")["entry/data/data"]
         if max_workers is None:
             # determine max workers from free memory and size of dataset
@@ -182,7 +193,7 @@ class SingleShotProcessor(ThreadPoolExecutor):
 
     def __process_diagnostics(self, src, dest, name):
         with h5py.File(src, "r") as f:
-            if self.discard_fist_last_img:
+            if self.discard_first_last_img:
                 images = f["entry/data/data"][()][1:-1]
             else:
                 images = f["entry/data/data"][()]
@@ -241,7 +252,7 @@ class SingleShotProcessor(ThreadPoolExecutor):
 
     def __process_pump_probe(self, src, dest):
         with h5py.File(src, "r") as f:
-            if self.discard_fist_last_img:
+            if self.discard_first_last_img:
                 images = f["entry/data/data"][()][1:-1]
             else:
                 images = f["entry/data/data"][()]
@@ -347,7 +358,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
         dest_file,
         mask=None,
         max_workers=None,
-        discard_fist_last_img=True,
+        discard_first_last_img=True,
         tempfile=None,
         rois={},
     ):
@@ -355,7 +366,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
         if path.exists(dest_file):
             raise OSError(f"{dest_file} already exists")
         self.dest_file = dest_file
-        self.discard_fist_last_img = discard_fist_last_img
+        self.discard_first_last_img = discard_first_last_img
         if tempfile is None:
             self.tempfile = Path(dest_file).stem + "_tmp.h5"
         else:
@@ -388,7 +399,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
             self.mask = mask.astype(np.uint16)
         self.rois = rois
         self.n_imgs = self.sample_dataset.shape[0]
-        if discard_fist_last_img:
+        if discard_first_last_img:
             self.n_imgs -= 2
         self.border_mask = np.ones(self.img_size).astype(np.uint16)
         self.border_mask[
@@ -497,7 +508,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
         border_2 = np.sum(border_2 * self.border_mask)
         if border_1 > border_2:
             confidence = border_1 / np.max((border_2, 1e-10))
-            if self.discard_fist_last_img:
+            if self.discard_first_last_img:
                 pump_on_slice = slice(2, -1, 2)
                 pump_off_slice = slice(1, -2, 2)
             else:
@@ -505,7 +516,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
                 pump_off_slice = slice(1, None, 2)
         else:
             confidence = border_2 / np.max((border_1, 1e-10))
-            if self.discard_fist_last_img:
+            if self.discard_first_last_img:
                 pump_on_slice = slice(1, -2, 2)
                 pump_off_slice = slice(2, -1, 2)
             else:
@@ -528,9 +539,9 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
             pump_on_images = f["entry/data/data"][pump_on_slice]
         if self.__check_image_integrity(pump_on_images):
             norm_values = masked_sum(pump_on_images, self.mask)
+            print(sys.getrefcount(pump_on_images), sys.getrefcount(self.mask))
             self.pump_on[delay_index] += normed_sum(pump_on_images, norm_values)
             self.sum_ints_pump_on[sum_int_slice] = norm_values
-            print(self.mask.shape)
             self.histogram_pump_on[delay_index] += masked_histogram(pump_on_images, self.mask)
             for key, slices in self.rois.items():
                 self.sum_ints_rois_pump_on[key][sum_int_slice] = indexed_masked_sum(pump_on_images, slices, self.mask)
@@ -547,7 +558,6 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
             norm_values = masked_sum(pump_off_images, self.mask)
             self.pump_off[delay_index] += normed_sum(pump_off_images, norm_values)
             self.sum_ints_pump_off[sum_int_slice] = norm_values
-            print(self.mask.shape)
             self.histogram_pump_off[delay_index] += masked_histogram(pump_off_images, self.mask)
             for key, slices in self.rois.items():
                 self.sum_ints_rois_pump_off[key][sum_int_slice] = indexed_masked_sum(pump_off_images, slices, self.mask)
@@ -556,7 +566,6 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
             for key in self.rois:
                 self.sum_ints_rois_pump_off[key][sum_int_slice] = np.NaN
             warnings.warn(f"found broken image in {src}; skipping...")
-
         self.__tempsave(progress=file_index / len(self.filelist))
 
     @staticmethod
@@ -573,6 +582,241 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
         if np.sum((images[:, :, 150] * self.mask[:, 150]) == 65535) > 3:
             return False
         return True
+
+
+def _process_pump_probe(src, tempdir, n_imgs, mask, border_mask, discard_first_last_img=True, rois=None):
+    with h5py.File(src, "r") as f:
+        if n_imgs > 1000:
+            border_1 = np.sum(f["entry/data/data"][900:1000:2], axis=0)
+            border_2 = np.sum(f["entry/data/data"][901:1001:2], axis=0)
+        else:
+            border_1 = np.sum(f["entry/data/data"][::2], axis=0)
+            border_2 = np.sum(f["entry/data/data"][1::2], axis=0)
+    # look at the borders of the the 10th block of 100 images and compare them
+    border_1 = np.sum(border_1 * border_mask)
+    border_2 = np.sum(border_2 * border_mask)
+    if border_1 > border_2:
+        confidence = border_1 / np.max((border_2, 1e-10))
+        if discard_first_last_img:
+            pump_on_slice = slice(2, -1, 2)
+            pump_off_slice = slice(1, -2, 2)
+        else:
+            pump_on_slice = slice(0, None, 2)
+            pump_off_slice = slice(1, None, 2)
+    else:
+        confidence = border_2 / np.max((border_1, 1e-10))
+        if discard_first_last_img:
+            pump_on_slice = slice(1, -2, 2)
+            pump_off_slice = slice(2, -1, 2)
+        else:
+            pump_on_slice = slice(1, None, 2)
+            pump_off_slice = slice(0, None, 2)
+    if confidence < 100:
+        warnings.warn(
+            f"low confidence in distinguishing pump on/off: {src} frac={border_1 / border_2}",
+            UndistinguishableWarning,
+        )
+    sum_ints_rois_pump_on = {}
+    sum_ints_rois_pump_off = {}
+
+    with h5py.File(src, "r") as f:
+        pump_on_images = f["entry/data/data"][pump_on_slice]
+    if _check_image_integrity(pump_on_images, mask):
+        norm_values = masked_sum(pump_on_images, mask)
+        pump_on = normed_sum(pump_on_images, norm_values)
+        sum_ints_pump_on = norm_values
+        histogram_pump_on = masked_histogram(pump_on_images, mask)
+        for key, slices in rois.items():
+            sum_ints_rois_pump_on[key] = indexed_masked_sum(pump_on_images, slices, mask)
+    else:
+        warnings.warn(f"found broken image in {src}; skipping...")
+        return
+    del pump_on_images
+
+    with h5py.File(src, "r") as f:
+        pump_off_images = f["entry/data/data"][pump_off_slice]
+    if _check_image_integrity(pump_off_images, mask):
+        norm_values = masked_sum(pump_off_images, mask)
+        pump_off = normed_sum(pump_off_images, norm_values)
+        sum_ints_pump_off = norm_values
+        histogram_pump_off = masked_histogram(pump_off_images, mask)
+        for key, slices in rois.items():
+            sum_ints_rois_pump_off[key] = indexed_masked_sum(pump_off_images, slices, mask)
+    else:
+        warnings.warn(f"found broken image in {src}; skipping...")
+        return
+
+    tempfile = path.join(tempdir, Path(src).stem + '.h5')
+    if path.exists(tempfile):
+        remove(tempfile)
+    with h5py.File(tempfile, "x") as f:
+        pump_on_group = f.create_group("pump_on")
+        pump_off_group = f.create_group("pump_off")
+        f.create_dataset("confidence", data=confidence)
+        f.create_dataset("mask", data=mask, **hdf5plugin.Bitshuffle())
+        pump_on_group.create_dataset(
+            "avg_intensities", data=pump_on, **hdf5plugin.Bitshuffle()
+        )
+        pump_on_group.create_dataset(
+            "sum_intensities", data=sum_ints_pump_on, **hdf5plugin.Bitshuffle()
+        )
+        pump_on_group.create_dataset(
+            "histogram", data=histogram_pump_on, **hdf5plugin.Bitshuffle()
+        )
+        pump_off_group.create_dataset(
+            "avg_intensities", data=pump_off, **hdf5plugin.Bitshuffle()
+        )
+        pump_off_group.create_dataset(
+            "sum_intensities",
+            data=sum_ints_pump_off,
+            **hdf5plugin.Bitshuffle(),
+        )
+        pump_off_group.create_dataset(
+            "histogram", data=histogram_pump_off, **hdf5plugin.Bitshuffle()
+        )
+        if rois:
+            roi_pump_on_group = pump_on_group.create_group("rois")
+            roi_pump_off_group = pump_off_group.create_group("rois")
+            for key, val in sum_ints_rois_pump_on.items():
+                roi_pump_on_group.create_dataset(key, data=val, **hdf5plugin.Bitshuffle())
+            for key, val in sum_ints_rois_pump_off.items():
+                roi_pump_off_group.create_dataset(key, data=val, **hdf5plugin.Bitshuffle())
+
+
+def _check_image_integrity(images, mask):
+    """
+    in rare cases we observe broken images that show vertical stripes with values of 2**16-1 = 65535
+    if we find an image like that, we just drop the entire batch of images
+    specifically we check the 150th column of all the images and check how often we find the value 65535
+    if it occurs more than 3 times, we drop the file
+    """
+    if np.sum((images[:, :, 150] * mask[:, 150]) == 65535) > 3:
+        return False
+    return True
+
+
+class SingleShotProcessorGen3(ThreadPoolExecutor):
+    """class to process hdf5 files from single shot experiments
+    no dark subtraction; no laser bg subtraction
+    the whole dataset will be saved into a single hdf5 file with the following structure
+    N - images per file; F - number of files to process
+    /                         Group
+    /confidence               Dataset {F} -> confidence that pump on/off is correctly identified
+    /pump_on                  Dataset {delays, image_x, image_y} -> pump on data
+    /pump_off                 Dataset {delays, image_x, image_y} -> pump off data
+    /sum_ints_pump_on         Dataset {F*N/2} -> sum intensity of every pump on image
+    /sum_ints_pump_off        Dataset {F*N/2} -> sum intensity of every pump off image
+    /histogram_pump_on        Dataset {delays, 2^16} -> histogram of pixel intensities in pump on images
+    /histogram_pump_off       Dataset {delays, 2^16} -> histogram of pixel intensities in pump off images
+
+    Example:
+    >>>from pathlib import Path
+    >>>from concurrent.futures import as_completed
+
+    >>>rundir = "/data/TiSe2_run_0010"
+    >>>with SingleShotProcessorGen2([str(p) for p in Path(rundir).rglob("*ps.h5")], max_workers=1) as ssp:
+    >>>    ssp.start()
+    >>>    for future in as_completed(ssp.futures):
+    >>>        print(ssp[future])
+    """
+
+    BORDERSIZE = 8
+
+    def __init__(
+        self,
+        filelist,
+        dest_file,
+        mask=None,
+        max_workers=None,
+        discard_first_last_img=True,
+        tempdir=None,
+        rois={},
+    ):
+        self.filelist = filelist
+        if path.exists(dest_file):
+            raise OSError(f"{dest_file} already exists")
+        self.dest_file = dest_file
+        self.discard_first_last_img = discard_first_last_img
+        if tempdir is None:
+            self.tempdir = "tmp"
+        else:
+            self.tempdir = tempdir
+        if not path.exists(self.tempdir):
+            os.mkdir(self.tempdir)
+        if path.isfile(self.tempdir):
+            raise OSError("tempdir exists and is a file")
+        self.sample_dataset = h5py.File(filelist[0], "r")["entry/data/data"]
+        if max_workers is None:
+            # determine max workers from free memory and size of dataset
+            free_memory = virtual_memory().available
+            datasets_in_memory = int(
+                free_memory
+                / (
+                    self.sample_dataset.dtype.itemsize
+                    * np.prod(self.sample_dataset.shape)
+                )
+            )
+            if datasets_in_memory == 0:
+                warnings.warn(
+                    "you might want to free up some system memory; you can't fit a whole dataset into it",
+                    ResourceWarning,
+                )
+                datasets_in_memory = 1
+            max_workers = datasets_in_memory
+        self.img_size = self.sample_dataset.shape[1:]
+        self.delays = np.array(
+            sorted(set([self.__delay_from_fname(fname) for fname in self.filelist]))
+        )
+        if mask is None:
+            self.mask = np.ones(self.img_size).astype(np.uint16)
+        else:
+            self.mask = mask.astype(np.uint16)
+        self.rois = rois
+        self.n_imgs = self.sample_dataset.shape[0]
+        if discard_first_last_img:
+            self.n_imgs -= 2
+        self.border_mask = np.ones(self.img_size).astype(np.uint16)
+        self.border_mask[
+            self.BORDERSIZE : -self.BORDERSIZE, self.BORDERSIZE : -self.BORDERSIZE
+        ] = 0
+
+        self.futures = {}
+        super().__init__(max_workers=max_workers)
+
+    def __getitem__(self, key):
+        return self.futures[key]
+
+    def watch(self):
+        Thread(target=self.__watch).start()
+
+    def __watch(self):
+        for future in as_completed(self.futures):
+            if future.exception():
+                raise future.exception()
+
+    def submit(self, filename):
+        return super().submit(self.__worker, filename)
+
+    def start(self):
+        self.futures = {self.submit(fname): fname for fname in self.filelist}
+        self.watch()
+
+    def shutdown(self, *args, **kwargs):
+        super().shutdown(*args, **kwargs)
+        self.__collect_results()
+
+    def __worker(self, filename):
+        if "pumpon" in filename:
+            _process_pump_probe(filename, self.tempdir, self.n_imgs, self.mask, self.border_mask, self.discard_first_last_img, self.rois)
+        else:
+            raise NotImplementedError(f"don't know what to do with {filename}")
+
+    def __collect_results(self):
+        pass
+
+    @staticmethod
+    def __delay_from_fname(fname):
+        return float(fname.split(r"/")[-1][7:17])
 
 
 class SingleShotDataset:
