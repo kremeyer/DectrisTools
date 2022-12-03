@@ -646,7 +646,9 @@ def _process_pump_probe(src, tempdir, n_imgs, mask, border_mask, discard_first_l
         warnings.warn(f"found broken image in {src}; skipping...")
         return
 
-    tempfile = path.join(tempdir, Path(src).stem + '.h5')
+    tempfile = path.join(tempdir, path.basename(Path(src).parent), path.basename(src))
+    if not path.isdir(Path(tempfile).parent):
+        os.mkdir(Path(tempfile).parent)
     if path.exists(tempfile):
         remove(tempfile)
     with h5py.File(tempfile, "x") as f:
@@ -803,7 +805,7 @@ class SingleShotProcessorGen3(ThreadPoolExecutor):
 
     def shutdown(self, *args, **kwargs):
         super().shutdown(*args, **kwargs)
-        self.__collect_results()
+        # self.__collect_results()
 
     def __worker(self, filename):
         if "pumpon" in filename:
@@ -811,8 +813,16 @@ class SingleShotProcessorGen3(ThreadPoolExecutor):
         else:
             raise NotImplementedError(f"don't know what to do with {filename}")
 
-    def __collect_results(self):
-        pass
+    def _collect_results(self):
+        raws = []
+        for file in self.filelist:
+            raws.append(path.join(path.basename(Path(file).parent), path.basename(file)))
+        processed = []
+        for file in Path(self.tempdir).rglob('*'):
+            local_name = path.join(path.basename(Path(file).parent), path.basename(file))
+            if local_name in raws:
+                processed.append(local_name)
+        print(f'collecting {len(processed)} of {len(raws)} files [{len(processed) / len(raws) * 100:.1f}]%')
 
     @staticmethod
     def __delay_from_fname(fname):
