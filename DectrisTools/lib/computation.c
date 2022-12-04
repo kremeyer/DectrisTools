@@ -150,15 +150,10 @@ masked_sum (PyObject * self, PyObject * args)
 //    Py_END_ALLOW_THREADS;
 
     /* keep track of the reference counting to make sure the python garbage collection can do it's thing */
-//    Py_DECREF (images_obj);
-//    Py_DECREF (mask_obj);
     PyArray_Free(images_obj, (void*)images);
     PyArray_Free(mask_obj, (void*)mask);
     PyArray_Free(sum_obj, sum);
-//    Py_DECREF (images_obj);
-//    Py_DECREF (mask_obj);
-//    free(images);
-//    free(mask);
-//    printf("%li %li\n", mask_shape[0], mask_shape[1]);
+    Py_DECREF (images_npyarray);
+    Py_DECREF (mask_npyarray);
     return sum_obj;
 }

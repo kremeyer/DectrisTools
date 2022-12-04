@@ -17,16 +17,16 @@ import hdf5plugin
 import h5py
 from tqdm import tqdm
 from numba import jit, prange
-# from .computation import masked_sum
+from .computation import masked_sum
 
 
-@jit(nopython=True)
-def masked_sum(images, mask):
-    n_imgs = images.shape[0]
-    ret = np.empty(n_imgs)
-    for i in prange(n_imgs):
-        ret[i] = np.sum(images[i] * mask)
-    return ret
+# @jit(nopython=True)
+# def masked_sum(images, mask):
+#     n_imgs = images.shape[0]
+#     ret = np.empty(n_imgs)
+#     for i in prange(n_imgs):
+#         ret[i] = np.sum(images[i] * mask)
+#     return ret
 
 
 @jit(nopython=True)
@@ -585,6 +585,13 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
 
 
 def _process_pump_probe(src, tempdir, n_imgs, mask, border_mask, discard_first_last_img=True, rois=None):
+    tempfile = path.join(tempdir, path.basename(Path(src).parent), path.basename(src))
+    if not path.isdir(Path(tempfile).parent):
+        os.mkdir(Path(tempfile).parent)
+    if path.exists(tempfile):
+        return
+        # remove(tempfile)
+
     with h5py.File(src, "r") as f:
         if n_imgs > 1000:
             border_1 = np.sum(f["entry/data/data"][900:1000:2], axis=0)
@@ -646,11 +653,6 @@ def _process_pump_probe(src, tempdir, n_imgs, mask, border_mask, discard_first_l
         warnings.warn(f"found broken image in {src}; skipping...")
         return
 
-    tempfile = path.join(tempdir, path.basename(Path(src).parent), path.basename(src))
-    if not path.isdir(Path(tempfile).parent):
-        os.mkdir(Path(tempfile).parent)
-    if path.exists(tempfile):
-        remove(tempfile)
     with h5py.File(tempfile, "x") as f:
         pump_on_group = f.create_group("pump_on")
         pump_off_group = f.create_group("pump_off")
