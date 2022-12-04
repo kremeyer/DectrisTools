@@ -656,6 +656,7 @@ def _process_pump_probe(src, tempdir, n_imgs, mask, border_mask, discard_first_l
         pump_off_group = f.create_group("pump_off")
         f.create_dataset("confidence", data=confidence)
         f.create_dataset("mask", data=mask, **hdf5plugin.Bitshuffle())
+        f.create_dataset("delay", data=_delay_from_fname(src))
         pump_on_group.create_dataset(
             "avg_intensities", data=pump_on, **hdf5plugin.Bitshuffle()
         )
@@ -697,6 +698,26 @@ def _check_image_integrity(images, mask):
     return True
 
 
+def _delay_from_fname(fname):
+    return float(fname.split(r"/")[-1][7:17])
+
+
+def _slice_to_tuple(sl):
+    if sl.start is None:
+        start = np.NaN
+    else:
+        start = int(sl.start)
+    if sl.stop is None:
+        stop = np.NaN
+    else:
+        stop = int(sl.start)
+    if sl.step is None:
+        step = np.NaN
+    else:
+        step = int(sl.start)
+    return start, stop, step
+
+
 class SingleShotProcessorGen3(ThreadPoolExecutor):
     """class to process hdf5 files from single shot experiments
     no dark subtraction; no laser bg subtraction
@@ -736,7 +757,9 @@ class SingleShotProcessorGen3(ThreadPoolExecutor):
     ):
         self.filelist = filelist
         if path.exists(dest_file):
-            raise OSError(f"{dest_file} already exists")
+            remove(dest_file)
+            # TODO: switch back before going to production
+            # raise OSError(f"{dest_file} already exists")
         self.dest_file = dest_file
         self.discard_first_last_img = discard_first_last_img
         if tempdir is None:
@@ -818,11 +841,78 @@ class SingleShotProcessorGen3(ThreadPoolExecutor):
         for file in self.filelist:
             raws.append(path.join(path.basename(Path(file).parent), path.basename(file)))
         processed = []
-        for file in Path(self.tempdir).rglob('*'):
-            local_name = path.join(path.basename(Path(file).parent), path.basename(file))
+        tmp_files = Path(self.tempdir).rglob('*')
+        for tmp_file in tmp_files:
+            local_name = path.join(path.basename(Path(tmp_file).parent), path.basename(tmp_file))
             if local_name in raws:
                 processed.append(local_name)
-        print(f'collecting {len(processed)} of {len(raws)} files [{len(processed) / len(raws) * 100:.1f}]%')
+        print(f'collecting {len(processed)} of {len(raws)} files [{len(processed) / len(raws) * 100:.1f}%]')
+
+        # allocate memory for final data
+        confidence = np.zeros(len(processed))
+        pump_on = np.zeros((len(self.delays), self.img_size[0], self.img_size[1]))
+        pump_off = np.zeros((len(self.delays), self.img_size[0], self.img_size[1]))
+        sum_ints_pump_on = np.zeros((int(len(processed) * self.n_imgs / 2)))
+        sum_ints_pump_off = np.zeros((int(len(processed) * self.n_imgs / 2)))
+        histogram_pump_on = np.zeros((len(self.delays), 2**16))
+        histogram_pump_off = np.zeros((len(self.delays), 2**16))
+        files_per_delay = np.zeros(len(self.delays))
+        sum_ints_rois_pump_on = {}
+        sum_ints_rois_pump_off = {}
+        for key in self.rois:
+            sum_ints_rois_pump_on[key] = np.zeros((int(len(processed) * self.n_imgs / 2)))
+            sum_ints_rois_pump_off[key] = np.zeros((int(len(processed) * self.n_imgs / 2)))
+
+        # read temporary files
+        for file in processed:
+            try:
+                file_index = processed.index(file)
+                delay_index = np.where(self.delays == self.__delay_from_fname(file))[0][0]
+                sum_int_slice = slice(
+                    int(file_index * self.n_imgs / 2), int((file_index + 1) * self.n_imgs / 2)
+                )
+                with h5py.File(path.join(self.tempdir, file), 'r') as f:
+                    confidence[file_index] = f['confidence'][()]
+
+                    pump_on[delay_index] += f['pump_on/avg_intensities'][()]
+                    sum_ints_pump_on[sum_int_slice] = f['pump_on/sum_intensities'][()]
+                    histogram_pump_on[delay_index] += f['pump_on/histogram'][()]
+                    for key in self.rois:
+                        sum_ints_rois_pump_on[key][sum_int_slice] = f[f'pump_on/rois/{key}'][()]
+
+                    pump_off[delay_index] += f['pump_off/avg_intensities'][()]
+                    sum_ints_pump_off[sum_int_slice] = f['pump_off/sum_intensities'][()]
+                    histogram_pump_off[delay_index] += f['pump_off/histogram'][()]
+                    for key in self.rois:
+                        sum_ints_rois_pump_off[key][sum_int_slice] = f[f'pump_off/rois/{key}'][()]
+                files_per_delay[delay_index] += 1
+            except BlockingIOError:
+                continue
+        pump_on /= files_per_delay[:, None, None]
+        pump_off /= files_per_delay[:, None, None]
+
+        # write final output file
+        with h5py.File(self.dest_file, 'x') as f:
+            f.create_dataset('confidence', data=confidence, **hdf5plugin.Bitshuffle())
+            f.create_dataset('mask', data=self.mask, **hdf5plugin.Bitshuffle())
+            pump_on_group = f.create_group('pump_on')
+            pump_off_group = f.create_group('pump_off')
+            rois_on_group = pump_on_group.create_group('rois')
+            rois_off_group = pump_off_group.create_group('rois')
+            pump_on_group.create_dataset('avg_intensities', data=pump_on, **hdf5plugin.Bitshuffle())
+            pump_on_group.create_dataset('sum_intensities', data=sum_ints_pump_on, **hdf5plugin.Bitshuffle())
+            pump_on_group.create_dataset('histogram', data=histogram_pump_on, **hdf5plugin.Bitshuffle())
+            for key, slices in self.rois.items():
+                key_group = rois_on_group.create_group(key)
+                key_group.create_dataset('sum_intensities', data=sum_ints_rois_pump_on[key], **hdf5plugin.Bitshuffle())
+                key_group.create_dataset(f'slices', data=(_slice_to_tuple(slices[0]), _slice_to_tuple(slices[1])))
+            pump_off_group.create_dataset('avg_intensities', data=pump_off, **hdf5plugin.Bitshuffle())
+            pump_off_group.create_dataset('sum_intensities', data=sum_ints_pump_off, **hdf5plugin.Bitshuffle())
+            pump_off_group.create_dataset('histogram', data=histogram_pump_off, **hdf5plugin.Bitshuffle())
+            for key, slices in self.rois.items():
+                key_group = rois_off_group.create_group(key)
+                key_group.create_dataset('sum_intensities', data=sum_ints_rois_pump_off[key], **hdf5plugin.Bitshuffle())
+                key_group.create_dataset(f'slices', data=(_slice_to_tuple(slices[0]), _slice_to_tuple(slices[1])))
 
     @staticmethod
     def __delay_from_fname(fname):
