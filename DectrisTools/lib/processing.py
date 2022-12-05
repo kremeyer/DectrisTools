@@ -17,7 +17,7 @@ import hdf5plugin
 import h5py
 from tqdm import tqdm
 from numba import jit, prange
-from .computation import masked_sum
+from .computation import masked_sum, normed_stack
 
 
 # @jit(nopython=True)
@@ -48,13 +48,13 @@ def masked_ravel(images, mask):
     return ret
 
 
-@jit(nopython=True)
-def normed_sum(images, norm_values):
-    n_imgs = images.shape[0]
-    ret = np.zeros(images[0].shape)
-    for i in range(n_imgs):
-        ret += images[i] / norm_values[i]
-    return ret
+# @jit(nopython=True)
+# def normed_stack(images, norm_values):
+#     n_imgs = images.shape[0]
+#     ret = np.zeros(images[0].shape)
+#     for i in range(n_imgs):
+#         ret += images[i] / norm_values[i]
+#     return ret
 
 
 @jit(nopython=True)
@@ -540,7 +540,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
         if self.__check_image_integrity(pump_on_images):
             norm_values = masked_sum(pump_on_images, self.mask)
             print(sys.getrefcount(pump_on_images), sys.getrefcount(self.mask))
-            self.pump_on[delay_index] += normed_sum(pump_on_images, norm_values)
+            self.pump_on[delay_index] += normed_stack(pump_on_images, norm_values)
             self.sum_ints_pump_on[sum_int_slice] = norm_values
             self.histogram_pump_on[delay_index] += masked_histogram(pump_on_images, self.mask)
             for key, slices in self.rois.items():
@@ -556,7 +556,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
             pump_off_images = f["entry/data/data"][pump_off_slice]
         if self.__check_image_integrity(pump_off_images):
             norm_values = masked_sum(pump_off_images, self.mask)
-            self.pump_off[delay_index] += normed_sum(pump_off_images, norm_values)
+            self.pump_off[delay_index] += normed_stack(pump_off_images, norm_values)
             self.sum_ints_pump_off[sum_int_slice] = norm_values
             self.histogram_pump_off[delay_index] += masked_histogram(pump_off_images, self.mask)
             for key, slices in self.rois.items():
@@ -630,7 +630,7 @@ def _process_pump_probe(src, tempdir, n_imgs, mask, border_mask, discard_first_l
         pump_on_images = f["entry/data/data"][pump_on_slice]
     if _check_image_integrity(pump_on_images, mask):
         norm_values = masked_sum(pump_on_images, mask)
-        pump_on = normed_sum(pump_on_images, norm_values)
+        pump_on = normed_stack(pump_on_images, norm_values)
         sum_ints_pump_on = norm_values
         histogram_pump_on = masked_histogram(pump_on_images, mask)
         for key, slices in rois.items():
@@ -644,7 +644,7 @@ def _process_pump_probe(src, tempdir, n_imgs, mask, border_mask, discard_first_l
         pump_off_images = f["entry/data/data"][pump_off_slice]
     if _check_image_integrity(pump_off_images, mask):
         norm_values = masked_sum(pump_off_images, mask)
-        pump_off = normed_sum(pump_off_images, norm_values)
+        pump_off = normed_stack(pump_off_images, norm_values)
         sum_ints_pump_off = norm_values
         histogram_pump_off = masked_histogram(pump_off_images, mask)
         for key, slices in rois.items():
