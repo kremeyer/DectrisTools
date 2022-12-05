@@ -17,58 +17,11 @@ import hdf5plugin
 import h5py
 from tqdm import tqdm
 from numba import jit, prange
-from .computation import masked_sum  # , normed_stack
+from .computation import masked_sum, normed_stack, masked_histogram
 
 
-# @jit(nopython=True)
-# def masked_sum(images, mask):
-#     n_imgs = images.shape[0]
-#     ret = np.empty(n_imgs)
-#     for i in prange(n_imgs):
-#         ret[i] = np.sum(images[i] * mask)
-#     return ret
-
-
-@jit(nopython=True)
 def indexed_masked_sum(images, slices, mask):
-    n_imgs = images.shape[0]
-    ret = np.empty(n_imgs)
-    for i in prange(n_imgs):
-        ret[i] = np.sum(images[i, slices[0], slices[1]] * mask[slices[0], slices[1]])
-    return ret
-
-
-@jit(nopython=True)
-def masked_ravel(images, mask):
-    n_imgs = images.shape[0]
-    n_pix = np.sum(mask)
-    ret = np.zeros(n_pix * n_imgs)
-    for i in prange(n_imgs):
-        ret[i * n_pix:(i + 1) * n_pix] = (images[i] * mask).ravel()
-    return ret
-
-
-@jit(nopython=True)
-def normed_stack(images, norm_values):
-    n_imgs = images.shape[0]
-    ret = np.zeros(images[0].shape)
-    for i in range(n_imgs):
-        ret += images[i] / norm_values[i]
-    return ret
-
-
-@jit(nopython=True)
-def masked_histogram(images, mask):
-    bins = np.zeros(2**16, dtype=np.uint64)
-    n_imgs = images.shape[0]
-    n_pix_masked = (mask.shape[0] * mask.shape[1]) - np.sum(mask)
-    for i in range(n_imgs):
-        image = images[i] * mask
-        for j in range(images.shape[1]):
-            for k in range(images.shape[2]):
-                bins[image[j, k]] += 1
-    bins[0] -= n_imgs * n_pix_masked  # subtract masked pixels that have been counted
-    return bins
+    return masked_sum(images[:, slices[0], slices[1], mask[slices[0], slices[1]]])
 
 
 class AlreadyProcessedWarning(Warning):
