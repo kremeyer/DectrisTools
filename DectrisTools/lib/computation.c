@@ -19,7 +19,7 @@ static PyObject *normed_stack (PyObject * self, PyObject * args);
 /* module method definitions */
 static PyMethodDef ComputationMethods[] = {
     {"masked_sum", masked_sum, METH_VARARGS, masked_sum_docstring},
-    {"normed_stack" normed_stack, METH_VARARGS, normed_stack_docstring},
+    {"normed_stack", normed_stack, METH_VARARGS, normed_stack_docstring},
     {NULL, NULL, 0, NULL},
 };
 
@@ -78,20 +78,24 @@ masked_sum (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "expected uint16 images array");
+	    Py_XDECREF(images_npyarray);
 	    return NULL;
 	}
 
     mask_npyarray = (PyArrayObject *) PyArray_FROM_O (mask_obj);
-    if (PyArray_NDIM (mask_npyarray) != 1)
+    if (PyArray_NDIM (mask_npyarray) != 2)
 	{
 	    PyErr_SetString (PyExc_IndexError, "expected ndim=1 mask array");
 	    Py_XDECREF(mask_npyarray);
+	    Py_XDECREF(images_npyarray);
 	    return NULL;
 	}
     if (PyArray_TYPE (mask_npyarray) != NPY_UINT16)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "expected uint16 mask array");
+	    Py_XDECREF(mask_npyarray);
+	    Py_XDECREF(images_npyarray);
 	    return NULL;
 	}
 
@@ -101,6 +105,8 @@ masked_sum (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_IndexError,
 			     "mask and image sizes do not match");
+	    Py_XDECREF(mask_npyarray);
+	    Py_XDECREF(images_npyarray);
 	    return NULL;
 	}
 
@@ -117,6 +123,8 @@ masked_sum (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "conversion of images to c array failed");
+	    Py_XDECREF(mask_npyarray);
+	    Py_XDECREF(images_npyarray);
 	    return NULL;
 	}
     if (PyArray_AsCArray
@@ -125,6 +133,9 @@ masked_sum (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "conversion of mask to c array failed");
+        PyArray_Free(images_obj, images);
+	    Py_XDECREF(mask_npyarray);
+	    Py_XDECREF(images_npyarray);
 	    return NULL;
 	}
 
@@ -136,6 +147,10 @@ masked_sum (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "conversion of sums to c array failed");
+        PyArray_Free(mask_obj, mask);
+        PyArray_Free(images_obj, images);
+	    Py_XDECREF(mask_npyarray);
+	    Py_XDECREF(images_npyarray);
 	    return NULL;
 	}
 
@@ -156,11 +171,12 @@ masked_sum (PyObject * self, PyObject * args)
     Py_END_ALLOW_THREADS;
 
     /* keep track of the reference counting to make sure the python garbage collection can do it's thing */
-    PyArray_Free(images_obj, (void*)images);
-    PyArray_Free(mask_obj, (void*)mask);
+    PyArray_Free(images_obj, images);
+    PyArray_Free(mask_obj, mask);
     PyArray_Free(sum_obj, sum);
     Py_DECREF (images_npyarray);
     Py_DECREF (mask_npyarray);
+
     return sum_obj;
 }
 
@@ -174,8 +190,8 @@ normed_stack (PyObject * self, PyObject * args)
     PyArrayObject *images_npyarray, *norm_values_npyarray;
     npy_intp *images_shape;
     npy_intp *norm_values_shape;
-    npy_uint16 ***images, **norm_values;
-    npy_uint64 ***normed_images;
+    npy_uint16 ***images;
+    npy_float32 ***normed_images, *norm_values;
 
     /* parse input objects, check dimensions and data types */
     if (!PyArg_ParseTuple (args, "OO", &images_obj, &norm_values_obj))
@@ -196,13 +212,15 @@ normed_stack (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "expected uint16 images array");
+	    Py_XDECREF(images_npyarray);
 	    return NULL;
 	}
 
     norm_values_npyarray = (PyArrayObject *) PyArray_FROM_O (norm_values_obj);
-    if (PyArray_NDIM (mask_npyarray) != 1)
+    if (PyArray_NDIM (norm_values_npyarray) != 1)
 	{
 	    PyErr_SetString (PyExc_IndexError, "expected ndim=1 norm_values array");
+        Py_XDECREF(images_npyarray);
 	    Py_XDECREF(norm_values_npyarray);
 	    return NULL;
 	}
@@ -210,6 +228,8 @@ normed_stack (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "expected float32 norm_values array");
+        Py_XDECREF(images_npyarray);
+	    Py_XDECREF(norm_values_npyarray);
 	    return NULL;
 	}
 
@@ -218,14 +238,15 @@ normed_stack (PyObject * self, PyObject * args)
     if (images_shape[0] != norm_values_shape[0])
 	{
 	    PyErr_SetString (PyExc_IndexError,
-			     "normen_values and image sizes do not match");
+			     "normed_values and image sizes do not match");
+        Py_XDECREF(images_npyarray);
+	    Py_XDECREF(norm_values_npyarray);
 	    return NULL;
 	}
 
     /* allocate memory for return array */
-    // TODO: INITIALIZE EMPTY ARRAY
     normed_images_obj =
-	PyArray_Zeros (1, &images_shape[0],
+	PyArray_Empty (3, images_shape,
 		       PyArray_DescrFromType (NPY_FLOAT32), 0);
     normed_images_npyarray = (PyArrayObject *) normed_images_obj;
 
@@ -236,14 +257,19 @@ normed_stack (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "conversion of images to c array failed");
+        Py_XDECREF(images_npyarray);
+	    Py_XDECREF(norm_values_npyarray);
 	    return NULL;
 	}
     if (PyArray_AsCArray
-	((PyObject **) & norm_values_npyarray, (void *) &norm_values, norm_values_shape, 2,
-	 PyArray_DescrFromType (NPY_UINT16)) == -1)
+	((PyObject **) & norm_values_npyarray, (void *) &norm_values, norm_values_shape, 1,
+	 PyArray_DescrFromType (NPY_FLOAT32)) == -1)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "conversion of norm_values to c array failed");
+        PyArray_Free(images_obj, (void*)images);
+        Py_XDECREF(images_npyarray);
+	    Py_XDECREF(norm_values_npyarray);
 	    return NULL;
 	}
 
@@ -253,6 +279,10 @@ normed_stack (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "conversion of normed_images to c array failed");
+        PyArray_Free(images_obj, (void*)images);
+        PyArray_Free(norm_values_obj, (void*)norm_values);
+        Py_XDECREF(images_npyarray);
+	    Py_XDECREF(norm_values_npyarray);
 	    return NULL;
 	}
 
@@ -265,7 +295,7 @@ normed_stack (PyObject * self, PyObject * args)
 		{
 		    for (int k = 0; k < images_shape[2]; k++)
 			{
-			    normed_images[i][j][k] += images[i][j][k]  * norm_values[i];
+			    normed_images[i][j][k] += images[i][j][k] / norm_values[i];
 			}
 		}
 	}
@@ -273,9 +303,9 @@ normed_stack (PyObject * self, PyObject * args)
 	Py_END_ALLOW_THREADS;
 
     /* keep track of the reference counting to make sure the python garbage collection can do it's thing */
-    PyArray_Free(images_obj, (void*)images);
-    PyArray_Free(norm_values_obj, (void*)norm_values);
-    PyArray_Free(normed_obj, normed);
+    PyArray_Free(images_obj, images);
+    PyArray_Free(norm_values_obj, norm_values);
+    PyArray_Free(normed_images_obj, normed_images);
     Py_DECREF (images_npyarray);
     Py_DECREF (norm_values_npyarray);
     return normed_images_obj;

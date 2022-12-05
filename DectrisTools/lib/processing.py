@@ -17,7 +17,7 @@ import hdf5plugin
 import h5py
 from tqdm import tqdm
 from numba import jit, prange
-from .computation import masked_sum, normed_stack
+from .computation import masked_sum  # , normed_stack
 
 
 # @jit(nopython=True)
@@ -48,13 +48,13 @@ def masked_ravel(images, mask):
     return ret
 
 
-# @jit(nopython=True)
-# def normed_stack(images, norm_values):
-#     n_imgs = images.shape[0]
-#     ret = np.zeros(images[0].shape)
-#     for i in range(n_imgs):
-#         ret += images[i] / norm_values[i]
-#     return ret
+@jit(nopython=True)
+def normed_stack(images, norm_values):
+    n_imgs = images.shape[0]
+    ret = np.zeros(images[0].shape)
+    for i in range(n_imgs):
+        ret += images[i] / norm_values[i]
+    return ret
 
 
 @jit(nopython=True)
@@ -538,7 +538,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
         with h5py.File(src, "r") as f:
             pump_on_images = f["entry/data/data"][pump_on_slice]
         if self.__check_image_integrity(pump_on_images):
-            norm_values = masked_sum(pump_on_images, self.mask)
+            norm_values = masked_sum(pump_on_images, self.mask).astype(np.float32)
             print(sys.getrefcount(pump_on_images), sys.getrefcount(self.mask))
             self.pump_on[delay_index] += normed_stack(pump_on_images, norm_values)
             self.sum_ints_pump_on[sum_int_slice] = norm_values
@@ -555,7 +555,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
         with h5py.File(src, "r") as f:
             pump_off_images = f["entry/data/data"][pump_off_slice]
         if self.__check_image_integrity(pump_off_images):
-            norm_values = masked_sum(pump_off_images, self.mask)
+            norm_values = masked_sum(pump_off_images, self.mask).astype(np.float32)
             self.pump_off[delay_index] += normed_stack(pump_off_images, norm_values)
             self.sum_ints_pump_off[sum_int_slice] = norm_values
             self.histogram_pump_off[delay_index] += masked_histogram(pump_off_images, self.mask)
