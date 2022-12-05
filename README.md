@@ -18,5 +18,5 @@ run with `python -m DectrisTools.[module]`
 
 ### caveats
 
-when building the fast-histogram dependency fails on one of computecanada's machines, try using `gcc >= 11.3.0` by running `module load gcc/11.3
+if building the package fails on one of computecanada's machines, try using `gcc >= 11.3.0` by running `module load gcc/11.3
 ` before installing the package
