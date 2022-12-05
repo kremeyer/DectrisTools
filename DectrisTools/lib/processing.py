@@ -888,7 +888,7 @@ class SingleShotProcessorGen3(ThreadPoolExecutor):
                     for key in self.rois:
                         sum_ints_rois_pump_off[key][sum_int_slice] = f[f'pump_off/rois/{key}'][()]
                 files_per_delay[delay_index] += 1
-            except BlockingIOError:
+            except (BlockingIOError, OSError):
                 continue
         pump_on /= files_per_delay[:, None, None]
         pump_off /= files_per_delay[:, None, None]
