@@ -7,11 +7,11 @@
 /* docstring definitions */
 static char module_docstring[] =
     "fast and memory efficient array manipulation for diffraction data processing";
-static char masked_histogram_docstring[]=
+static char masked_histogram_docstring[] =
     "histogram for stack of uint16 images; a mask is applied before adding pixel to histogram";
 static char masked_sum_docstring[] =
     "compute the sums along axis 1 and 2 in a 3d array; a mask is applied before summation";
-static char normed_stack_docstring[]=
+static char normed_stack_docstring[] =
     "normalize stack of images to an 1d array";
 
 /* function declarations */
@@ -21,7 +21,8 @@ static PyObject *normed_stack (PyObject * self, PyObject * args);
 
 /* module method definitions */
 static PyMethodDef ComputationMethods[] = {
-    {"masked_histogram", masked_histogram, METH_VARARGS, masked_histogram_docstring},
+    {"masked_histogram", masked_histogram, METH_VARARGS,
+     masked_histogram_docstring},
     {"masked_sum", masked_sum, METH_VARARGS, masked_sum_docstring},
     {"normed_stack", normed_stack, METH_VARARGS, normed_stack_docstring},
     {NULL, NULL, 0, NULL},
@@ -75,14 +76,14 @@ masked_histogram (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_IndexError,
 			     "expected ndim=3 images array");
-	    Py_XDECREF(images_npyarray);
+	    Py_XDECREF (images_npyarray);
 	    return NULL;
 	}
     if (PyArray_TYPE (images_npyarray) != NPY_UINT16)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "expected uint16 images array");
-	    Py_XDECREF(images_npyarray);
+	    Py_XDECREF (images_npyarray);
 	    return NULL;
 	}
 
@@ -90,16 +91,16 @@ masked_histogram (PyObject * self, PyObject * args)
     if (PyArray_NDIM (mask_npyarray) != 2)
 	{
 	    PyErr_SetString (PyExc_IndexError, "expected ndim=1 mask array");
-	    Py_XDECREF(mask_npyarray);
-	    Py_XDECREF(images_npyarray);
+	    Py_XDECREF (mask_npyarray);
+	    Py_XDECREF (images_npyarray);
 	    return NULL;
 	}
     if (PyArray_TYPE (mask_npyarray) != NPY_UINT16)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "expected uint16 mask array");
-	    Py_XDECREF(mask_npyarray);
-	    Py_XDECREF(images_npyarray);
+	    Py_XDECREF (mask_npyarray);
+	    Py_XDECREF (images_npyarray);
 	    return NULL;
 	}
 
@@ -109,16 +110,15 @@ masked_histogram (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_IndexError,
 			     "mask and image sizes do not match");
-	    Py_XDECREF(mask_npyarray);
-	    Py_XDECREF(images_npyarray);
+	    Py_XDECREF (mask_npyarray);
+	    Py_XDECREF (images_npyarray);
 	    return NULL;
 	}
 
     /* allocate memory for return array */
     npy_intp n_bins = 65536;
     histogram_obj =
-	PyArray_Zeros (1, &n_bins,
-		       PyArray_DescrFromType (NPY_UINT64), 0);
+	PyArray_Zeros (1, &n_bins, PyArray_DescrFromType (NPY_UINT64), 0);
     histogram_npyarray = (PyArrayObject *) histogram_obj;
 
     /* get pointers that simulate C-style array for easier iteration */
@@ -128,8 +128,8 @@ masked_histogram (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "conversion of images to c array failed");
-	    Py_XDECREF(mask_npyarray);
-	    Py_XDECREF(images_npyarray);
+	    Py_XDECREF (mask_npyarray);
+	    Py_XDECREF (images_npyarray);
 	    return NULL;
 	}
     if (PyArray_AsCArray
@@ -138,9 +138,9 @@ masked_histogram (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "conversion of mask to c array failed");
-        PyArray_Free(images_obj, images);
-	    Py_XDECREF(mask_npyarray);
-	    Py_XDECREF(images_npyarray);
+	    PyArray_Free (images_obj, images);
+	    Py_XDECREF (mask_npyarray);
+	    Py_XDECREF (images_npyarray);
 	    return NULL;
 	}
 
@@ -150,10 +150,10 @@ masked_histogram (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "conversion of histogram to c array failed");
-        PyArray_Free(mask_obj, mask);
-        PyArray_Free(images_obj, images);
-	    Py_XDECREF(mask_npyarray);
-	    Py_XDECREF(images_npyarray);
+	    PyArray_Free (mask_obj, mask);
+	    PyArray_Free (images_obj, images);
+	    Py_XDECREF (mask_npyarray);
+	    Py_XDECREF (images_npyarray);
 	    return NULL;
 	}
 
@@ -166,9 +166,10 @@ masked_histogram (PyObject * self, PyObject * args)
 		{
 		    for (int k = 0; k < images_shape[2]; k++)
 			{
-			    if (mask[j][k] == 1){
-                    histogram[images[i][j][k]]++;
-			    }
+			    if (mask[j][k] == 1)
+				{
+				    histogram[images[i][j][k]]++;
+				}
 			}
 		}
 	}
@@ -176,11 +177,11 @@ masked_histogram (PyObject * self, PyObject * args)
     Py_END_ALLOW_THREADS;
 
     /* keep track of the reference counting to make sure the python garbage collection can do it's thing */
-    PyArray_Free(images_obj, images);
-    PyArray_Free(mask_obj, mask);
-    PyArray_Free(histogram_obj, histogram);
-    Py_DECREF(images_npyarray);
-    Py_DECREF(mask_npyarray);
+    PyArray_Free (images_obj, images);
+    PyArray_Free (mask_obj, mask);
+    PyArray_Free (histogram_obj, histogram);
+    Py_DECREF (images_npyarray);
+    Py_DECREF (mask_npyarray);
 
     return histogram_obj;
 }
@@ -210,14 +211,14 @@ masked_sum (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_IndexError,
 			     "expected ndim=3 images array");
-	    Py_XDECREF(images_npyarray);
+	    Py_XDECREF (images_npyarray);
 	    return NULL;
 	}
     if (PyArray_TYPE (images_npyarray) != NPY_UINT16)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "expected uint16 images array");
-	    Py_XDECREF(images_npyarray);
+	    Py_XDECREF (images_npyarray);
 	    return NULL;
 	}
 
@@ -225,16 +226,16 @@ masked_sum (PyObject * self, PyObject * args)
     if (PyArray_NDIM (mask_npyarray) != 2)
 	{
 	    PyErr_SetString (PyExc_IndexError, "expected ndim=1 mask array");
-	    Py_XDECREF(mask_npyarray);
-	    Py_XDECREF(images_npyarray);
+	    Py_XDECREF (mask_npyarray);
+	    Py_XDECREF (images_npyarray);
 	    return NULL;
 	}
     if (PyArray_TYPE (mask_npyarray) != NPY_UINT16)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "expected uint16 mask array");
-	    Py_XDECREF(mask_npyarray);
-	    Py_XDECREF(images_npyarray);
+	    Py_XDECREF (mask_npyarray);
+	    Py_XDECREF (images_npyarray);
 	    return NULL;
 	}
 
@@ -244,8 +245,8 @@ masked_sum (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_IndexError,
 			     "mask and image sizes do not match");
-	    Py_XDECREF(mask_npyarray);
-	    Py_XDECREF(images_npyarray);
+	    Py_XDECREF (mask_npyarray);
+	    Py_XDECREF (images_npyarray);
 	    return NULL;
 	}
 
@@ -262,8 +263,8 @@ masked_sum (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "conversion of images to c array failed");
-	    Py_XDECREF(mask_npyarray);
-	    Py_XDECREF(images_npyarray);
+	    Py_XDECREF (mask_npyarray);
+	    Py_XDECREF (images_npyarray);
 	    return NULL;
 	}
     if (PyArray_AsCArray
@@ -272,9 +273,9 @@ masked_sum (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "conversion of mask to c array failed");
-        PyArray_Free(images_obj, images);
-	    Py_XDECREF(mask_npyarray);
-	    Py_XDECREF(images_npyarray);
+	    PyArray_Free (images_obj, images);
+	    Py_XDECREF (mask_npyarray);
+	    Py_XDECREF (images_npyarray);
 	    return NULL;
 	}
 
@@ -286,10 +287,10 @@ masked_sum (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "conversion of sums to c array failed");
-        PyArray_Free(mask_obj, mask);
-        PyArray_Free(images_obj, images);
-	    Py_XDECREF(mask_npyarray);
-	    Py_XDECREF(images_npyarray);
+	    PyArray_Free (mask_obj, mask);
+	    PyArray_Free (images_obj, images);
+	    Py_XDECREF (mask_npyarray);
+	    Py_XDECREF (images_npyarray);
 	    return NULL;
 	}
 
@@ -310,9 +311,9 @@ masked_sum (PyObject * self, PyObject * args)
     Py_END_ALLOW_THREADS;
 
     /* keep track of the reference counting to make sure the python garbage collection can do it's thing */
-    PyArray_Free(images_obj, images);
-    PyArray_Free(mask_obj, mask);
-    PyArray_Free(sum_obj, sum);
+    PyArray_Free (images_obj, images);
+    PyArray_Free (mask_obj, mask);
+    PyArray_Free (sum_obj, sum);
     Py_DECREF (images_npyarray);
     Py_DECREF (mask_npyarray);
 
@@ -344,31 +345,32 @@ normed_stack (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_IndexError,
 			     "expected ndim=3 images array");
-	    Py_XDECREF(images_npyarray);
+	    Py_XDECREF (images_npyarray);
 	    return NULL;
 	}
     if (PyArray_TYPE (images_npyarray) != NPY_UINT16)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "expected uint16 images array");
-	    Py_XDECREF(images_npyarray);
+	    Py_XDECREF (images_npyarray);
 	    return NULL;
 	}
 
     norm_values_npyarray = (PyArrayObject *) PyArray_FROM_O (norm_values_obj);
     if (PyArray_NDIM (norm_values_npyarray) != 1)
 	{
-	    PyErr_SetString (PyExc_IndexError, "expected ndim=1 norm_values array");
-        Py_XDECREF(images_npyarray);
-	    Py_XDECREF(norm_values_npyarray);
+	    PyErr_SetString (PyExc_IndexError,
+			     "expected ndim=1 norm_values array");
+	    Py_XDECREF (images_npyarray);
+	    Py_XDECREF (norm_values_npyarray);
 	    return NULL;
 	}
     if (PyArray_TYPE (norm_values_npyarray) != NPY_FLOAT32)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "expected float32 norm_values array");
-        Py_XDECREF(images_npyarray);
-	    Py_XDECREF(norm_values_npyarray);
+	    Py_XDECREF (images_npyarray);
+	    Py_XDECREF (norm_values_npyarray);
 	    return NULL;
 	}
 
@@ -378,8 +380,8 @@ normed_stack (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_IndexError,
 			     "normed_values and image sizes do not match");
-        Py_XDECREF(images_npyarray);
-	    Py_XDECREF(norm_values_npyarray);
+	    Py_XDECREF (images_npyarray);
+	    Py_XDECREF (norm_values_npyarray);
 	    return NULL;
 	}
 
@@ -396,36 +398,36 @@ normed_stack (PyObject * self, PyObject * args)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "conversion of images to c array failed");
-        Py_XDECREF(images_npyarray);
-	    Py_XDECREF(norm_values_npyarray);
+	    Py_XDECREF (images_npyarray);
+	    Py_XDECREF (norm_values_npyarray);
 	    return NULL;
 	}
     if (PyArray_AsCArray
-	((PyObject **) & norm_values_npyarray, (void *) &norm_values, norm_values_shape, 1,
-	 PyArray_DescrFromType (NPY_FLOAT32)) == -1)
+	((PyObject **) & norm_values_npyarray, (void *) &norm_values,
+	 norm_values_shape, 1, PyArray_DescrFromType (NPY_FLOAT32)) == -1)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "conversion of norm_values to c array failed");
-        PyArray_Free(images_obj, (void*)images);
-        Py_XDECREF(images_npyarray);
-	    Py_XDECREF(norm_values_npyarray);
+	    PyArray_Free (images_obj, (void *) images);
+	    Py_XDECREF (images_npyarray);
+	    Py_XDECREF (norm_values_npyarray);
 	    return NULL;
 	}
 
     if (PyArray_AsCArray
-	((PyObject **) & normed_images_npyarray, (void *) &normed_images, images_shape, 3,
-	 PyArray_DescrFromType (NPY_FLOAT32)) == -1)
+	((PyObject **) & normed_images_npyarray, (void *) &normed_images,
+	 images_shape, 3, PyArray_DescrFromType (NPY_FLOAT32)) == -1)
 	{
 	    PyErr_SetString (PyExc_RuntimeError,
 			     "conversion of normed_images to c array failed");
-        PyArray_Free(images_obj, (void*)images);
-        PyArray_Free(norm_values_obj, (void*)norm_values);
-        Py_XDECREF(images_npyarray);
-	    Py_XDECREF(norm_values_npyarray);
+	    PyArray_Free (images_obj, (void *) images);
+	    PyArray_Free (norm_values_obj, (void *) norm_values);
+	    Py_XDECREF (images_npyarray);
+	    Py_XDECREF (norm_values_npyarray);
 	    return NULL;
 	}
 
-	Py_BEGIN_ALLOW_THREADS;
+    Py_BEGIN_ALLOW_THREADS;
 
     /* actual computation */
     for (int i = 0; i < images_shape[0]; i++)
@@ -434,17 +436,18 @@ normed_stack (PyObject * self, PyObject * args)
 		{
 		    for (int k = 0; k < images_shape[2]; k++)
 			{
-			    normed_images[i][j][k] += images[i][j][k] / norm_values[i];
+			    normed_images[i][j][k] +=
+				images[i][j][k] / norm_values[i];
 			}
 		}
 	}
 
-	Py_END_ALLOW_THREADS;
+    Py_END_ALLOW_THREADS;
 
     /* keep track of the reference counting to make sure the python garbage collection can do it's thing */
-    PyArray_Free(images_obj, images);
-    PyArray_Free(norm_values_obj, norm_values);
-    PyArray_Free(normed_images_obj, normed_images);
+    PyArray_Free (images_obj, images);
+    PyArray_Free (norm_values_obj, norm_values);
+    PyArray_Free (normed_images_obj, normed_images);
     Py_DECREF (images_npyarray);
     Py_DECREF (norm_values_npyarray);
     return normed_images_obj;
