@@ -2,7 +2,7 @@ from sys import getrefcount
 import numpy as np
 from DectrisTools.lib.computation import masked_histogram as c_masked_histogram
 from DectrisTools.lib.computation import masked_sum as c_masked_sum
-from DectrisTools.lib.computation import normed_stack as c_normed_stack
+from DectrisTools.lib.computation import normed_sum as c_normed_sum
 
 
 STACKSIZE = 1_000
@@ -26,8 +26,8 @@ def __masked_sum_reference(images, mask):
     return np.sum(images * mask[None, :, :], axis=(1, 2))
 
 
-def __normed_stack_reference(images, norm_values):
-    return images / norm_values[:, None, None]
+def __normed_sum_reference(images, norm_values):
+    return np.sum(images / norm_values[:, None, None], axis=0)
 
 
 def test_c_masked_histogram_integrity():
@@ -54,13 +54,13 @@ def test_c_masked_sum_ref_counting():
     assert (getrefcount(TEST_IMAGES), getrefcount(TEST_MASK)) == (refcount_images, refcount_mask)
 
 
-def test_c_normed_stack_integrity():
-    reference = __normed_stack_reference(TEST_IMAGES, TEST_NORM_VALUES)
-    assert (c_normed_stack(TEST_IMAGES, TEST_NORM_VALUES) == reference).all()
+def test_c_normed_sum_integrity():
+    reference = __normed_sum_reference(TEST_IMAGES, TEST_NORM_VALUES)
+    assert (c_normed_sum(TEST_IMAGES, TEST_NORM_VALUES) == reference).all()
 
 
-def test_c_normed_stack_ref_counting():
+def test_c_normed_sum_ref_counting():
     refcount_images = getrefcount(TEST_IMAGES)
     refcount_norm_values = getrefcount(TEST_NORM_VALUES)
-    c_normed_stack(TEST_IMAGES, TEST_NORM_VALUES)
+    c_normed_sum(TEST_IMAGES, TEST_NORM_VALUES)
     assert (getrefcount(TEST_IMAGES), getrefcount(TEST_NORM_VALUES)) == (refcount_images, refcount_norm_values)

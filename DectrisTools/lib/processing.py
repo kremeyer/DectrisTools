@@ -2,7 +2,7 @@
 module for data processing tools
 """
 import os
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import sys
 from threading import Thread
 from collections.abc import Iterable
@@ -16,12 +16,11 @@ import numpy as np
 import hdf5plugin
 import h5py
 from tqdm import tqdm
-from numba import jit, prange
-from .computation import masked_sum, normed_stack, masked_histogram
+from .computation import masked_histogram, masked_sum, normed_sum
 
 
 def indexed_masked_sum(images, slices, mask):
-    return masked_sum(images[:, slices[0], slices[1], mask[slices[0], slices[1]]])
+    return masked_sum(images[:, slices[0], slices[1]], mask[slices[0], slices[1]])
 
 
 class AlreadyProcessedWarning(Warning):
@@ -493,7 +492,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
         if self.__check_image_integrity(pump_on_images):
             norm_values = masked_sum(pump_on_images, self.mask).astype(np.float32)
             print(sys.getrefcount(pump_on_images), sys.getrefcount(self.mask))
-            self.pump_on[delay_index] += normed_stack(pump_on_images, norm_values)
+            self.pump_on[delay_index] += normed_sum(pump_on_images, norm_values)
             self.sum_ints_pump_on[sum_int_slice] = norm_values
             self.histogram_pump_on[delay_index] += masked_histogram(pump_on_images, self.mask)
             for key, slices in self.rois.items():
@@ -509,7 +508,7 @@ class SingleShotProcessorGen2(ThreadPoolExecutor):
             pump_off_images = f["entry/data/data"][pump_off_slice]
         if self.__check_image_integrity(pump_off_images):
             norm_values = masked_sum(pump_off_images, self.mask).astype(np.float32)
-            self.pump_off[delay_index] += normed_stack(pump_off_images, norm_values)
+            self.pump_off[delay_index] += normed_sum(pump_off_images, norm_values)
             self.sum_ints_pump_off[sum_int_slice] = norm_values
             self.histogram_pump_off[delay_index] += masked_histogram(pump_off_images, self.mask)
             for key, slices in self.rois.items():
@@ -582,8 +581,8 @@ def _process_pump_probe(src, tempdir, n_imgs, mask, border_mask, discard_first_l
     with h5py.File(src, "r") as f:
         pump_on_images = f["entry/data/data"][pump_on_slice]
     if _check_image_integrity(pump_on_images, mask):
-        norm_values = masked_sum(pump_on_images, mask)
-        pump_on = normed_stack(pump_on_images, norm_values)
+        norm_values = masked_sum(pump_on_images, mask).astype(np.float32)
+        pump_on = normed_sum(pump_on_images, norm_values)
         sum_ints_pump_on = norm_values
         histogram_pump_on = masked_histogram(pump_on_images, mask)
         for key, slices in rois.items():
@@ -596,8 +595,8 @@ def _process_pump_probe(src, tempdir, n_imgs, mask, border_mask, discard_first_l
     with h5py.File(src, "r") as f:
         pump_off_images = f["entry/data/data"][pump_off_slice]
     if _check_image_integrity(pump_off_images, mask):
-        norm_values = masked_sum(pump_off_images, mask)
-        pump_off = normed_stack(pump_off_images, norm_values)
+        norm_values = masked_sum(pump_off_images, mask).astype(np.float32)
+        pump_off = normed_sum(pump_off_images, norm_values)
         sum_ints_pump_off = norm_values
         histogram_pump_off = masked_histogram(pump_off_images, mask)
         for key, slices in rois.items():
@@ -819,7 +818,7 @@ class SingleShotProcessorGen3(ThreadPoolExecutor):
             sum_ints_rois_pump_off[key] = np.zeros((int(len(processed) * self.n_imgs / 2)))
 
         # read temporary files
-        for file in processed:
+        for file in tqdm(processed):
             try:
                 file_index = processed.index(file)
                 delay_index = np.where(self.delays == self.__delay_from_fname(file))[0][0]
@@ -848,8 +847,9 @@ class SingleShotProcessorGen3(ThreadPoolExecutor):
 
         # write final output file
         with h5py.File(self.dest_file, 'x') as f:
-            f.create_dataset('confidence', data=confidence, **hdf5plugin.Bitshuffle())
+            f.create_dataset('confidence', data=confidence)
             f.create_dataset('mask', data=self.mask, **hdf5plugin.Bitshuffle())
+            f.create_dataset('delays', data=self.delays)
             pump_on_group = f.create_group('pump_on')
             pump_off_group = f.create_group('pump_off')
             rois_on_group = pump_on_group.create_group('rois')
