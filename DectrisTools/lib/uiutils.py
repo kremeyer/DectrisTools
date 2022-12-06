@@ -36,20 +36,14 @@ class DectrisImageGrabber(QObject):
         try:
             _ = self.Q.state
             self.connected = True
-            log.info(
-                f"DectrisImageGrabber successfully connected to detector\n{self.Q}"
-            )
+            log.info(f"DectrisImageGrabber successfully connected to detector\n{self.Q}")
         except OSError:
-            log.warning(
-                "DectrisImageGrabber could not establish connection to detector"
-            )
+            log.warning("DectrisImageGrabber could not establish connection to detector")
 
         # prepare the hardware for taking images
         if self.connected:
             if self.Q.state == "na":
-                log.warning(
-                    "Detector needs to be initialized, that may take a while..."
-                )
+                log.warning("Detector needs to be initialized, that may take a while...")
                 self.Q.initialize()
             self.Q.mon.clear()
             self.Q.fw.clear()
@@ -75,9 +69,7 @@ class DectrisImageGrabber(QObject):
         """
         image collection method
         """
-        log.debug(
-            f"started image_grabber_thread {self.image_grabber_thread.currentThread()}"
-        )
+        log.debug(f"started image_grabber_thread {self.image_grabber_thread.currentThread()}")
         if self.connected:
             self.Q.ntrigger = 1
             self.Q.arm()
@@ -107,19 +99,12 @@ class DectrisImageGrabber(QObject):
             x = np.linspace(-10, 10, 512)
             xs, ys = np.meshgrid(x, x)
             img = 5e4 * (
-                (
-                    np.cos(np.hypot(xs, ys))
-                    / (np.hypot(xs, ys) + 1)
-                    * np.random.normal(1, 0.4, (512, 512))
-                )
-                + 0.3
+                (np.cos(np.hypot(xs, ys)) / (np.hypot(xs, ys) + 1) * np.random.normal(1, 0.4, (512, 512))) + 0.3
             )
             self.image_ready.emit(img)
 
         self.image_grabber_thread.quit()
-        log.debug(
-            f"quit image_grabber_thread {self.image_grabber_thread.currentThread()}"
-        )
+        log.debug(f"quit image_grabber_thread {self.image_grabber_thread.currentThread()}")
 
     def wait_for_state(self, state_name, logic=True):
         """
@@ -157,9 +142,7 @@ class DectrisStatusGrabber(QObject):
             self.connected = True
             log.info("DectrisStatusGrabber successfully connected to detector")
         except OSError:
-            log.warning(
-                "DectrisStatusGrabber could not establish connection to detector"
-            )
+            log.warning("DectrisStatusGrabber could not establish connection to detector")
 
         self.status_grabber_thread = QThread()
         self.moveToThread(self.status_grabber_thread)
@@ -167,9 +150,7 @@ class DectrisStatusGrabber(QObject):
 
     @pyqtSlot()
     def __get_status(self):
-        log.debug(
-            f"started status_grabber_thread {self.status_grabber_thread.currentThread()}"
-        )
+        log.debug(f"started status_grabber_thread {self.status_grabber_thread.currentThread()}")
         if self.connected:
             self.status_ready.emit(
                 {
@@ -193,9 +174,7 @@ class DectrisStatusGrabber(QObject):
                 }
             )
         self.status_grabber_thread.quit()
-        log.debug(
-            f"quit status_grabber_thread {self.status_grabber_thread.currentThread()}"
-        )
+        log.debug(f"quit status_grabber_thread {self.status_grabber_thread.currentThread()}")
 
 
 def interrupt_acquisition(f):

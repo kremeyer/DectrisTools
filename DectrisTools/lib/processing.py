@@ -25,7 +25,7 @@ class BrokenImageWarning(Warning):
     pass
 
 
-def process_pump_probe(src, tempdir='tmp', mask=None, border_size=8, discard_first_last_img=True, rois=None):
+def process_pump_probe(src, tempdir="tmp", mask=None, border_size=8, discard_first_last_img=True, rois=None):
     warns = []
 
     tempfile = path.join(tempdir, path.basename(Path(src).parent), path.basename(src))
@@ -36,15 +36,15 @@ def process_pump_probe(src, tempdir='tmp', mask=None, border_size=8, discard_fir
         except FileExistsError:
             pass
     if path.exists(tempfile):
-        warns.append(AlreadyProcessedWarning(f'{src} already processed; skipping'))
+        warns.append(AlreadyProcessedWarning(f"{src} already processed; skipping"))
         return warns
 
     with h5py.File(src, "r") as f:
         img_size = f["entry/data/data"].shape[1:]
-        start_idx = int(f["entry/data/data"].shape[0]/10)
+        start_idx = int(f["entry/data/data"].shape[0] / 10)
         stop_idx = start_idx + 100
         border_1 = np.sum(f["entry/data/data"][start_idx:stop_idx:2], axis=0)
-        border_2 = np.sum(f["entry/data/data"][start_idx + 1:stop_idx + 1:2], axis=0)
+        border_2 = np.sum(f["entry/data/data"][start_idx + 1 : stop_idx + 1 : 2], axis=0)
 
     border_mask = generate_bordermask(mask.shape, border_size)
     border_1 = np.sum(border_1 * border_mask)
@@ -66,7 +66,11 @@ def process_pump_probe(src, tempdir='tmp', mask=None, border_size=8, discard_fir
             pump_on_slice = slice(1, None, 2)
             pump_off_slice = slice(0, None, 2)
     if confidence < 50:
-        warns.append(UndistinguishableWarning(f"low confidence in distinguishing pump on/off: {src} frac={max(border_1 / border_2, border_2 / border_1)}"))
+        warns.append(
+            UndistinguishableWarning(
+                f"low confidence in distinguishing pump on/off: {src} frac={max(border_1 / border_2, border_2 / border_1)}"
+            )
+        )
 
     sum_ints_rois_pump_on = {}
     sum_ints_rois_pump_off = {}
@@ -107,26 +111,16 @@ def process_pump_probe(src, tempdir='tmp', mask=None, border_size=8, discard_fir
         f.create_dataset("confidence", data=confidence)
         f.create_dataset("mask", data=mask, **hdf5plugin.Bitshuffle())
         f.create_dataset("delay", data=delay_from_fname(src))
-        pump_on_group.create_dataset(
-            "avg_intensities", data=pump_on, **hdf5plugin.Bitshuffle()
-        )
-        pump_on_group.create_dataset(
-            "sum_intensities", data=sum_ints_pump_on, **hdf5plugin.Bitshuffle()
-        )
-        pump_on_group.create_dataset(
-            "histogram", data=histogram_pump_on, **hdf5plugin.Bitshuffle()
-        )
-        pump_off_group.create_dataset(
-            "avg_intensities", data=pump_off, **hdf5plugin.Bitshuffle()
-        )
+        pump_on_group.create_dataset("avg_intensities", data=pump_on, **hdf5plugin.Bitshuffle())
+        pump_on_group.create_dataset("sum_intensities", data=sum_ints_pump_on, **hdf5plugin.Bitshuffle())
+        pump_on_group.create_dataset("histogram", data=histogram_pump_on, **hdf5plugin.Bitshuffle())
+        pump_off_group.create_dataset("avg_intensities", data=pump_off, **hdf5plugin.Bitshuffle())
         pump_off_group.create_dataset(
             "sum_intensities",
             data=sum_ints_pump_off,
             **hdf5plugin.Bitshuffle(),
         )
-        pump_off_group.create_dataset(
-            "histogram", data=histogram_pump_off, **hdf5plugin.Bitshuffle()
-        )
+        pump_off_group.create_dataset("histogram", data=histogram_pump_off, **hdf5plugin.Bitshuffle())
         if rois:
             roi_pump_on_group = pump_on_group.create_group("rois")
             roi_pump_off_group = pump_off_group.create_group("rois")
@@ -171,9 +165,7 @@ def slice_to_tuple(sl):
 
 def generate_bordermask(mask_shape, border_size):
     border_mask = np.ones(mask_shape).astype(np.uint16)
-    border_mask[
-        border_size : -border_size, border_size : -border_size
-    ] = 0
+    border_mask[border_size:-border_size, border_size:-border_size] = 0
     return border_mask
 
 

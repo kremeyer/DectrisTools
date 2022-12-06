@@ -1,4 +1,5 @@
-"""example file for processing a single-shot dataset
+"""
+example file for processing a single-shot dataset
 this script should be run with something like `mpirun -n XX python3 process_single_shot.py | tee processing.log`
 """
 from pathlib import Path
