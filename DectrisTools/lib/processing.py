@@ -124,11 +124,95 @@ def process_pump_probe(src, tempdir="tmp", mask=None, border_size=8, discard_fir
         if rois:
             roi_pump_on_group = pump_on_group.create_group("rois")
             roi_pump_off_group = pump_off_group.create_group("rois")
-            for key, val in sum_ints_rois_pump_on.items():
-                roi_pump_on_group.create_dataset(key, data=val, **hdf5plugin.Bitshuffle())
-            for key, val in sum_ints_rois_pump_off.items():
-                roi_pump_off_group.create_dataset(key, data=val, **hdf5plugin.Bitshuffle())
+            for key, slices in rois.items():
+                key_group = roi_pump_on_group.create_group(key)
+                key_group.create_dataset('sum_intensities', data=sum_ints_rois_pump_on[key], **hdf5plugin.Bitshuffle())
+                key_group.create_dataset('slices', data=(slice_to_tuple(slices[0]), slice_to_tuple(slices[1])), **hdf5plugin.Bitshuffle())
+                key_group = roi_pump_off_group.create_group(key)
+                key_group.create_dataset('sum_intensities', data=sum_ints_rois_pump_off[key], **hdf5plugin.Bitshuffle())
+                key_group.create_dataset('slices', data=(slice_to_tuple(slices[0]), slice_to_tuple(slices[1])), **hdf5plugin.Bitshuffle())
         return warns
+
+
+def collect_results(tempdir, result_file):
+    processed_files = (sorted(list(Path(tempdir).rglob('**/*.h5'))))
+
+    delays = np.array(sorted(set([delay_from_fname(str(fname)) for fname in processed_files])))
+
+    # get general info from first temp file
+    rois = {}
+    with h5py.File(processed_files[-1], 'r') as f:
+        img_size = f['mask'].shape
+        mask = f['mask'][()]
+        n_imgs = f['pump_on/sum_intensities'].shape[0]
+        if 'rois' in f['pump_on']:
+            for roi in f['pump_on/rois']:
+                slice_info = f[f'pump_on/rois/{roi}/slices'][()]
+                rois[roi] = (tuple_to_slice(slice_info[0]), tuple_to_slice(slice_info[1]))
+
+    # allocate memory for final data
+    confidence = np.zeros(len(processed_files))
+    pump_on = np.zeros((len(delays), img_size[0], img_size[1]))
+    pump_off = np.zeros((len(delays), img_size[0], img_size[1]))
+    sum_ints_pump_on = np.zeros((int(len(processed_files) * n_imgs)))
+    sum_ints_pump_off = np.zeros((int(len(processed_files) * n_imgs)))
+    histogram_pump_on = np.zeros((len(delays), 2**16))
+    histogram_pump_off = np.zeros((len(delays), 2**16))
+    files_per_delay = np.zeros(len(delays))
+    sum_ints_rois_pump_on = {}
+    sum_ints_rois_pump_off = {}
+    for key in rois:
+        sum_ints_rois_pump_on[key] = np.zeros((int(len(processed_files) * n_imgs)))
+        sum_ints_rois_pump_off[key] = np.zeros((int(len(processed_files) * n_imgs)))
+
+    # read temporary files
+    for file in processed_files:
+        try:
+            file_index = processed_files.index(file)
+            delay_index = np.where(delays == delay_from_fname(str(file)))[0][0]
+            sum_int_slice = slice(
+                int(file_index * n_imgs), int((file_index + 1) * n_imgs)
+            )
+            with h5py.File(path.join(tempdir, file), 'r') as f:
+                confidence[file_index] = f['confidence'][()]
+                pump_on[delay_index] += f['pump_on/avg_intensities'][()]
+                sum_ints_pump_on[sum_int_slice] = f['pump_on/sum_intensities'][()]
+                histogram_pump_on[delay_index] += f['pump_on/histogram'][()]
+                for key in rois:
+                    sum_ints_rois_pump_on[key][sum_int_slice] = f[f'pump_on/rois/{key}/sum_intensities'][()]
+                pump_off[delay_index] += f['pump_off/avg_intensities'][()]
+                sum_ints_pump_off[sum_int_slice] = f['pump_off/sum_intensities'][()]
+                histogram_pump_off[delay_index] += f['pump_off/histogram'][()]
+                for key in rois:
+                    sum_ints_rois_pump_off[key][sum_int_slice] = f[f'pump_off/rois/{key}/sum_intensities'][()]
+            files_per_delay[delay_index] += 1
+        except (BlockingIOError, OSError):
+            continue
+    pump_on /= files_per_delay[:, None, None]
+    pump_off /= files_per_delay[:, None, None]
+
+    # write final output file
+    with h5py.File(result_file, 'x') as f:
+        f.create_dataset('confidence', data=confidence, **hdf5plugin.Bitshuffle())
+        f.create_dataset('mask', data=mask, **hdf5plugin.Bitshuffle())
+        pump_on_group = f.create_group('pump_on')
+        pump_off_group = f.create_group('pump_off')
+        rois_on_group = pump_on_group.create_group('rois')
+        rois_off_group = pump_off_group.create_group('rois')
+        pump_on_group.create_dataset('avg_intensities', data=pump_on, **hdf5plugin.Bitshuffle())
+        pump_on_group.create_dataset('sum_intensities', data=sum_ints_pump_on, **hdf5plugin.Bitshuffle())
+        pump_on_group.create_dataset('histogram', data=histogram_pump_on, **hdf5plugin.Bitshuffle())
+        for key, slices in rois.items():
+            key_group = rois_on_group.create_group(key)
+            key_group.create_dataset('sum_intensities', data=sum_ints_rois_pump_on[key], **hdf5plugin.Bitshuffle())
+            key_group.create_dataset(f'slices', data=(slice_to_tuple(slices[0]), slice_to_tuple(slices[1])))
+        pump_off_group.create_dataset('avg_intensities', data=pump_off, **hdf5plugin.Bitshuffle())
+        pump_off_group.create_dataset('sum_intensities', data=sum_ints_pump_off, **hdf5plugin.Bitshuffle())
+        pump_off_group.create_dataset('histogram', data=histogram_pump_off, **hdf5plugin.Bitshuffle())
+        for key, slices in rois.items():
+            key_group = rois_off_group.create_group(key)
+            key_group.create_dataset('sum_intensities', data=sum_ints_rois_pump_off[key], **hdf5plugin.Bitshuffle())
+            key_group.create_dataset(f'slices', data=(slice_to_tuple(slices[0]), slice_to_tuple(slices[1])))
 
 
 def check_image_integrity(images, mask):
@@ -155,12 +239,28 @@ def slice_to_tuple(sl):
     if sl.stop is None:
         stop = np.NaN
     else:
-        stop = int(sl.start)
+        stop = int(sl.stop)
     if sl.step is None:
         step = np.NaN
     else:
-        step = int(sl.start)
+        step = int(sl.step)
     return start, stop, step
+
+
+def tuple_to_slice(tup):
+    if np.isnan(tup[0]):
+        start = None
+    else:
+        start = tup[1]
+    if np.isnan(tup[0]):
+        stop = None
+    else:
+        stop = tup[1]
+    if np.isnan(tup[2]):
+        step = None
+    else:
+        step = tup[2]
+    return slice(start, stop, step)
 
 
 def generate_bordermask(mask_shape, border_size):
@@ -168,6 +268,8 @@ def generate_bordermask(mask_shape, border_size):
     border_mask[border_size:-border_size, border_size:-border_size] = 0
     return border_mask
 
+
+# TODO: introduce function to read files from logfile, so they are in ordered in lab time
 
 # TODO: NEEDS MAJOR CHANGES TO ACCOMPANY THE NEW FORMAT
 # class SingleShotDataset:
