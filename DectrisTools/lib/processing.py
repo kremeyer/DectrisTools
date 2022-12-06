@@ -9,23 +9,120 @@ import h5py
 from .computation import masked_histogram, masked_sum, normed_sum
 
 
+"""
+masked_histogram(images, mask)
+
+generates an array of occurences of pixel values in the masked images; bins are integers from 0 to (2**16)-1
+
+Parameters
+----------
+images: array_like
+    3d array of images; dtype hast to be np.uint16
+slices: indexable of two slices
+    slices that the images and mask will be indexed with
+mask: array_like; dtype hast to be np.uint16
+    2d array of the mask that will be applied to the images; must be the same shape as each image
+
+Returns
+-------
+array_like
+    1d array of the occurences of pixel values in the masked and indexed images; bins are integers from 0 to (2**16)-1
+"""
+
+
+"""
+masked_sum(images, mask)
+
+sum of a 3d-array along the 2 last axis; a 2d mask will be applied before summation
+
+Parameters
+----------
+images: array_like
+    3d array of images; dtype hast to be np.uint16
+mask: array_like; dtype hast to be np.uint16
+    2d array of the mask that will be applied to the images; must be the same shape as each image
+    
+Returns
+-------
+array_like
+    1d array of the sums in the masked images
+"""
+
+
+"""
+normed_sum(images, norm_values)
+
+sum of a 3d-array along the first axis; each image will be normalized to the corresponding value before the summation
+
+Parameters
+----------
+images: array_like
+    3d array of images; dtype hast to be np.uint16
+norm_values: array_like
+    1d array values to normalize the images to; dtype has to be np.float32
+    
+Returns
+-------
+array_like
+    2d array of the sum of the normalized images
+"""
+
+
 def indexed_masked_sum(images, slices, mask):
+    """calls the masked_sum function but indexes the images and masks array before passing them
+
+    Parameters
+    ----------
+    images: array_like
+        3d array of images
+    slices: indexable of two slices
+        slices that the images and mask will be indexed with
+    mask: array_like
+        2d array of the mask that will be applied to the images; must be the same shape as each image
+
+    Returns
+    -------
+    array_like
+        1d array of the sums in the masked and indexed images
+    """
     return masked_sum(images[:, slices[0], slices[1]], mask[slices[0], slices[1]])
 
 
 def indexed_masked_histogram(images, slices, mask):
+    """calls the masked_histogram function but indexes the images and masks array before passing them
+
+    Parameters
+    ----------
+    images: array_like
+        3d array of images
+    slices: indexable of two slices
+        slices that the images and mask will be indexed with
+    mask: array_like
+        2d array of the mask that will be applied to the images; must be the same shape as each image
+
+    Returns
+    -------
+    array_like
+        1d array of the occurences of pixel values in the masked and indexed images; bins integers from 0 to (2**16)-1
+    """
     return masked_histogram(images[:, slices[0], slices[1]], mask[slices[0], slices[1]])
 
 
 class AlreadyProcessedWarning(Warning):
+    """warning to throw when encountering an already processed file that will not be overwritten
+    """
     pass
 
 
 class UndistinguishableWarning(Warning):
+    """warning to throw when encountering a stack of image where pump on and off cannot be distinguished with high confidence
+    """
     pass
 
 
 class BrokenImageWarning(Warning):
+    """warning to throw when encountering broken images
+    """
     pass
 
 

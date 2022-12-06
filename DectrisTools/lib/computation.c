@@ -416,5 +416,4 @@ normed_sum (PyObject * self, PyObject * args)
     Py_DECREF (images_npyarray);
     Py_DECREF (norm_values_npyarray);
     return sum_img_obj;
-//    return Py_None;
 }
