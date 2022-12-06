@@ -6,7 +6,12 @@ setup(
     name="DectrisTools",
     version=VERSION,
     packages=find_packages(),
-    ext_modules=[Extension(name="DectrisTools.lib.computation", sources=[join("DectrisTools", "lib", "computation.c")])],
+    ext_modules=[
+        Extension(
+            name="DectrisTools.lib.computation",
+            sources=[join("DectrisTools", "lib", "computation.c")],
+        )
+    ],
     include_package_data=True,
     install_requires=[
         "numpy",

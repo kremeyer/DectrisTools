@@ -26,9 +26,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         log.debug("initializing DectrisLiveView")
         super().__init__(*args, **kwargs)
         uic.loadUi(path.join(get_base_path(), "ui/liveview.ui"), self)
-        self.settings = QtCore.QSettings(
-            "Siwick Research Group", "DectrisTools Liveview", parent=self
-        )
+        self.settings = QtCore.QSettings("Siwick Research Group", "DectrisTools Liveview", parent=self)
         if self.settings.value("main_window_geometry") is not None:
             self.setGeometry(self.settings.value("main_window_geometry"))
         if self.settings.value("pin_histogram_zero") is not None:
@@ -42,9 +40,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
                     self.viewer.setLevels(*self.settings.value("image_levels"))
                     self.viewer.setHistogramRange(*self.settings.value("image_levels"))
                 if self.settings.value("histogram_range") is not None:
-                    self.viewer.ui.histogram.setHistogramRange(
-                        *self.settings.value("histogram_range"), padding=0
-                    )
+                    self.viewer.ui.histogram.setHistogramRange(*self.settings.value("histogram_range"), padding=0)
 
         self.update_interval = cmd_args.update_interval
 
@@ -64,15 +60,11 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.dectris_status_grabber = DectrisStatusGrabber(cmd_args.ip, cmd_args.port)
 
         self.image_timer = QtCore.QTimer()
-        self.image_timer.timeout.connect(
-            self.dectris_image_grabber.image_grabber_thread.start
-        )
+        self.image_timer.timeout.connect(self.dectris_image_grabber.image_grabber_thread.start)
         self.dectris_image_grabber.image_ready.connect(self.update_image)
 
         self.status_timer = QtCore.QTimer()
-        self.status_timer.timeout.connect(
-            self.dectris_status_grabber.status_grabber_thread.start
-        )
+        self.status_timer.timeout.connect(self.dectris_status_grabber.status_grabber_thread.start)
         self.dectris_status_grabber.status_ready.connect(self.update_status_labels)
 
         self.lineEditExposure.returnPressed.connect(self.update_exposure)
@@ -101,14 +93,10 @@ class LiveViewUi(QtWidgets.QMainWindow):
                 i.win.hide()
         self.settings.setValue("main_window_geometry", self.geometry())
         self.settings.setValue("image_levels", self.viewer.getLevels())
-        self.settings.setValue(
-            "auto_levels", self.viewer.view.menu.autoLevels.isChecked()
-        )
+        self.settings.setValue("auto_levels", self.viewer.view.menu.autoLevels.isChecked())
         hist_range = tuple(self.viewer.ui.histogram.item.vb.viewRange()[1])  # wtf?
         self.settings.setValue("histogram_range", hist_range)
-        self.settings.setValue(
-            "pin_histogram_zero", self.actionPinHistogramZero.isChecked()
-        )
+        self.settings.setValue("pin_histogram_zero", self.actionPinHistogramZero.isChecked())
         self.hide()
         self.image_timer.stop()
         self.status_timer.stop()
@@ -135,9 +123,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.labelIntensity.setText(f'({"":>4s}, {"":>4s})   {"":>{self.i_digits}s}')
         self.labelExposureUser.setText("Exposure [ms]")
         fake_spacer = QtWidgets.QLabel()  # status bar does not accect QSpacerItem
-        fake_spacer.setSizePolicy(
-            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
-        )
+        fake_spacer.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.lineEditExposure.setMaximumSize(90, 100)
 
         self.statusbar.addPermanentWidget(self.labelExposureUser)
@@ -165,16 +151,12 @@ class LiveViewUi(QtWidgets.QMainWindow):
             lambda x=self.actionShowCrosshair.isChecked(): self.viewer.show_crosshair(x)
         )
         self.actionShowMaxPixelValue.setShortcut("M")
-        self.actionShowFrame.triggered.connect(
-            lambda x=self.actionShowFrame.isChecked(): self.viewer.show_frame(x)
-        )
+        self.actionShowFrame.triggered.connect(lambda x=self.actionShowFrame.isChecked(): self.viewer.show_frame(x))
         self.actionShowFrame.setShortcut("F")
         self.actionPinHistogramZero.setShortcut("H")
         self.actionPinHistogramZero.triggered.connect(self.pin_histogram_zero)
         self.viewer.ui.histogram.sigLevelsChanged.connect(self.pin_histogram_zero)
-        self.viewer.ui.histogram.item.vb.sigRangeChangedManually.connect(
-            self.pin_histogram_zero
-        )
+        self.viewer.ui.histogram.item.vb.sigRangeChangedManually.connect(self.pin_histogram_zero)
 
         trigger_mode_group = QtWidgets.QActionGroup(self)
         trigger_mode_group.addAction(self.actionINTS)
@@ -197,9 +179,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot(tuple)
     def update_label_intensity(self, xy):
         if self.image is None or xy == (np.NaN, np.NaN):
-            self.labelIntensity.setText(
-                f'({"":>4s}, {"":>4s})   {"":>{self.i_digits}s}'
-            )
+            self.labelIntensity.setText(f'({"":>4s}, {"":>4s})   {"":>{self.i_digits}s}')
             return
         x, y = xy
         i = self.image[x, y]
@@ -213,9 +193,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
             self.labelExposure.setText(f'Exposure: {"":>5s}  ')
             self.labelCmode.setText(f'Counting: {"":>9s}')
         else:
-            self.labelState.setText(
-                f'Detector: {states["quadro"]:>7s} Monitor: {states["mon"]:>7s}'
-            )
+            self.labelState.setText(f'Detector: {states["quadro"]:>7s} Monitor: {states["mon"]:>7s}')
             self.labelTrigger.setText(f'Trigger: {states["trigger_mode"]:>4s}')
             if states["trigger_mode"] == "exts":
                 self.labelExposure.setText("Exposure:   trig ")
@@ -243,9 +221,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
                 try:
                     time = float(self.lineEditCapture.text()) / 1000
                 except (ValueError, TypeError):
-                    log.warning(
-                        f"image capture: cannot convert {self.lineEditCapture.text()} to float"
-                    )
+                    log.warning(f"image capture: cannot convert {self.lineEditCapture.text()} to float")
                     return
 
                 self.dectris_image_grabber.Q.trigger_mode = "ints"
@@ -295,9 +271,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         try:
             time = float(self.lineEditExposure.text()) / 1000
         except (ValueError, TypeError):
-            log.warning(
-                f"setting exposure: cannot convert {self.lineEditExposure.text()} to float"
-            )
+            log.warning(f"setting exposure: cannot convert {self.lineEditExposure.text()} to float")
             return
 
         log.info(f"changing exporue time to {time}")
