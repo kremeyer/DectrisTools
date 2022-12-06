@@ -17,9 +17,7 @@ warnings.simplefilter("ignore", ResourceWarning)
 
 
 def parse_args():
-    parser = ArgumentParser(
-        description="script to take a series of static diffraction images"
-    )
+    parser = ArgumentParser(description="script to take a series of static diffraction images")
     parser.add_argument("--dcu_ip", type=str, default=IP, help="DCU ip address")
     parser.add_argument("--dcu_port", type=int, default=PORT, help="DCU port")
     parser.add_argument(

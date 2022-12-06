@@ -46,9 +46,7 @@ def parse_args():
     parser.add_argument("--savedir", type=str, help="save directory")
     parser.add_argument("--n_scans", type=int, help="number of scans")
     parser.add_argument("--delays", type=str)
-    parser.add_argument(
-        "--exposure", type=float, default=30, help="exposure time of each image"
-    )
+    parser.add_argument("--exposure", type=float, default=30, help="exposure time of each image")
     args = parser.parse_args()
     return args
 
@@ -134,11 +132,7 @@ def run(cmd_args):
 
     # start experiment
     logfile = open(path.join(savedir, "experiment.log"), "w+")
-    logfile.write(
-        fmt_log(
-            f"starting experiment with {cmd_args.n_scans} scans at {len(delays)} delays"
-        )
-    )
+    logfile.write(fmt_log(f"starting experiment with {cmd_args.n_scans} scans at {len(delays)} delays"))
     flush()
     try:
         mkdir(path.join(savedir, DIR_LASER_BG))
@@ -148,9 +142,7 @@ def run(cmd_args):
             s_pump.enable(False)
             s_probe.enable(False)
             while True:
-                exception = acquire_image(
-                    Q, savedir, DIR_LASER_BG, f"dark_epoch_{time():010.0f}s.tif"
-                )
+                exception = acquire_image(Q, savedir, DIR_LASER_BG, f"dark_epoch_{time():010.0f}s.tif")
                 if exception:
                     logfile.write(fmt_log(str(exception)))
                 else:
@@ -158,9 +150,7 @@ def run(cmd_args):
             s_pump.enable(True)
             s_probe.enable(False)
             while True:
-                exception = acquire_image(
-                    Q, savedir, DIR_LASER_BG, f"laser_bg_epoch_{time():010.0f}s.tif"
-                )
+                exception = acquire_image(Q, savedir, DIR_LASER_BG, f"laser_bg_epoch_{time():010.0f}s.tif")
                 if exception:
                     logfile.write(fmt_log(str(exception)))
                 else:
@@ -169,9 +159,7 @@ def run(cmd_args):
             s_pump.enable(False)
             s_probe.enable(True)
             while True:
-                exception = acquire_image(
-                    Q, savedir, DIR_PUMP_OFF, f"pump_off_epoch_{time():010.0f}s.tif"
-                )
+                exception = acquire_image(Q, savedir, DIR_PUMP_OFF, f"pump_off_epoch_{time():010.0f}s.tif")
                 if exception:
                     logfile.write(fmt_log(str(exception)))
                 else:
@@ -193,11 +181,7 @@ def run(cmd_args):
                         logfile.write(fmt_log(str(exception)))
                     else:
                         break
-                logfile.write(
-                    fmt_log(
-                        f"pump on image acquired at scan {i+1} and time-delay {delay:.1f}ps"
-                    )
-                )
+                logfile.write(fmt_log(f"pump on image acquired at scan {i+1} and time-delay {delay:.1f}ps"))
                 flush()
 
         s_pump.enable(False)

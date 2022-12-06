@@ -14,7 +14,6 @@ run with `python -m DectrisTools.[module]`
 * `statemonitor`: show live detector information
 * `snapshot`: save the next image that will be recorded as an HDF5-file
 * `single_shot_experiment`: start a single shot pump on/off experiment
-* `process_single_shot`: process and reduce the raw data that you took with `single_shot_experiment`
 
 ### caveats
 

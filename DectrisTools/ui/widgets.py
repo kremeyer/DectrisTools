@@ -33,9 +33,7 @@ class ImageViewWidget(pg.ImageView):
         self.view.menu.logScale.triggered.connect(self.update_scale)
         self.view.menu.sqrtScale.triggered.connect(self.update_scale)
 
-        self.proxy = pg.SignalProxy(
-            self.scene.sigMouseMoved, rateLimit=60, slot=self.__callback_move
-        )
+        self.proxy = pg.SignalProxy(self.scene.sigMouseMoved, rateLimit=60, slot=self.__callback_move)
 
         self.max_label = pg.LabelItem(justify="right")
         self.frame_top = pg.InfiniteLine(angle=0, movable=False)
@@ -70,9 +68,7 @@ class ImageViewWidget(pg.ImageView):
             self.image = np.sqrt(self.image, where=self.image > 0)
 
         if max_label:
-            self.max_label.setText(
-                f'<span style="font-size: 32pt">{int(self.image.max())}</span>'
-            )
+            self.max_label.setText(f'<span style="font-size: 32pt">{int(self.image.max())}</span>')
         else:
             self.max_label.setText("")
 
@@ -80,18 +76,12 @@ class ImageViewWidget(pg.ImageView):
             x_projection_data = np.mean(self.image, axis=0)
             x_projection_data /= np.mean(x_projection_data)
             x_projection_data *= self.image.shape[1] * 0.1
-            self.x_projection.setData(
-                x=x_projection_data, y=np.arange(0, self.image.shape[1]) + 0.5
-            )
+            self.x_projection.setData(x=x_projection_data, y=np.arange(0, self.image.shape[1]) + 0.5)
 
             y_projection_data = np.mean(self.image, axis=1)
             y_projection_data /= np.max(y_projection_data)
-            y_projection_data *= (
-                self.image.shape[0] * 0.1
-            )  # make plot span 10% of the image
-            self.y_projection.setData(
-                x=np.arange(0, self.image.shape[0]) + 0.5, y=y_projection_data
-            )
+            y_projection_data *= self.image.shape[0] * 0.1  # make plot span 10% of the image
+            self.y_projection.setData(x=np.arange(0, self.image.shape[0]) + 0.5, y=y_projection_data)
         else:
             self.x_projection.clear()
             self.y_projection.clear()
@@ -187,13 +177,9 @@ class ViewBoxMenu(pg.graphicsItems.ViewBox.ViewBoxMenu.ViewBoxMenu):
     def __init__(self, view):
         QtWidgets.QMenu.__init__(self)
 
-        self.view = weakref.ref(
-            view
-        )  # keep weakref to view to avoid circular reference
+        self.view = weakref.ref(view)  # keep weakref to view to avoid circular reference
         self.valid = False  # tells us whether the ui needs to be updated
-        self.viewMap = (
-            weakref.WeakValueDictionary()
-        )  # weakrefs to all views listed in the link combos
+        self.viewMap = weakref.WeakValueDictionary()  # weakrefs to all views listed in the link combos
 
         self.setTitle("ViewBox options")
         self.viewAll = QtGui.QAction("View All", self)

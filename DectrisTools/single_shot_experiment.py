@@ -146,9 +146,7 @@ def run(cmd_args):
             s_pump.enable(True)
             s_probe.enable(False)
             while True:
-                exception = acquire_image_series(
-                    Q, savedir, DIR_LASER_BG, f"laser_bg_epoch_{time():010.0f}s.h5"
-                )
+                exception = acquire_image_series(Q, savedir, DIR_LASER_BG, f"laser_bg_epoch_{time():010.0f}s.h5")
                 if exception:
                     logfile.write(fmt_log(str(exception)))
                 else:
@@ -157,9 +155,7 @@ def run(cmd_args):
             s_pump.enable(False)
             s_probe.enable(True)
             while True:
-                exception = acquire_image_series(
-                    Q, savedir, DIR_PUMP_OFF, f"pump_off_epoch_{time():010.0f}s.h5"
-                )
+                exception = acquire_image_series(Q, savedir, DIR_PUMP_OFF, f"pump_off_epoch_{time():010.0f}s.h5")
                 if exception:
                     logfile.write(fmt_log(str(exception)))
                 else:
@@ -181,11 +177,7 @@ def run(cmd_args):
                         logfile.write(fmt_log(str(exception)))
                     else:
                         break
-                logfile.write(
-                    fmt_log(
-                        f"pump on image series acquired at scan {i+1} and time-delay {delay:.1f}ps"
-                    )
-                )
+                logfile.write(fmt_log(f"pump on image series acquired at scan {i+1} and time-delay {delay:.1f}ps"))
 
         s_pump.enable(False)
         s_probe.enable(False)
