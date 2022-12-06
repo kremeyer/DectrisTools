@@ -277,8 +277,8 @@ def collect_results(tempdir, result_file):
     for key in rois:
         sum_ints_rois_pump_on[key] = np.zeros((int(len(processed_files) * n_imgs)))
         sum_ints_rois_pump_off[key] = np.zeros((int(len(processed_files) * n_imgs)))
-        histograms_rois_pump_on[key] = np.zeros(2**16)
-        histograms_rois_pump_off[key] = np.zeros(2**16)
+        histograms_rois_pump_on[key] = np.zeros((len(delays), 2**16))
+        histograms_rois_pump_off[key] = np.zeros((len(delays), 2**16))
 
     # read temporary files
     for file in processed_files:
@@ -293,13 +293,13 @@ def collect_results(tempdir, result_file):
                 histogram_pump_on[delay_index] += f["pump_on/histogram"][()]
                 for key in rois:
                     sum_ints_rois_pump_on[key][sum_int_slice] = f[f"pump_on/rois/{key}/sum_intensities"][()]
-                    histograms_rois_pump_on[key] += f[f"pump_on/rois/{key}/histogram"][()]
+                    histograms_rois_pump_on[key][delay_index] += f[f"pump_on/rois/{key}/histogram"][()]
                 pump_off[delay_index] += f["pump_off/avg_intensities"][()]
                 sum_ints_pump_off[sum_int_slice] = f["pump_off/sum_intensities"][()]
                 histogram_pump_off[delay_index] += f["pump_off/histogram"][()]
                 for key in rois:
                     sum_ints_rois_pump_off[key][sum_int_slice] = f[f"pump_off/rois/{key}/sum_intensities"][()]
-                    histograms_rois_pump_off[key] += f[f"pump_on/rois/{key}/histogram"][()]
+                    histograms_rois_pump_off[key][delay_index] += f[f"pump_on/rois/{key}/histogram"][()]
             files_per_delay[delay_index] += 1
         except (BlockingIOError, OSError):
             continue
