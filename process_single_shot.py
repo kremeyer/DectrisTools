@@ -25,7 +25,8 @@ for i, file in enumerate(filelist):
     if i % size == rank:
         warns = process_pump_probe(file, mask=mask, rois=rois)
         print(
-            f"{datetime.strftime(datetime.now(), '%Y/%m/%d %H:%M:%S')}: rank {rank:03d} processed {file} [{100 * i / len(filelist):.2f}%]"
+            f"{datetime.strftime(datetime.now(), '%Y/%m/%d %H:%M:%S')}:\
+            rank {rank:03d} processed {file} [{100 * i / len(filelist):.2f}%]"
         )
         for warn in warns:
             print(f"rank {rank:03d} encountered {type(warn).__name__} with message: {str(warn)}")
