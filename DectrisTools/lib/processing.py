@@ -488,8 +488,8 @@ def tuple_to_slice(tup):
     if np.isnan(tup[0]):
         start = None
     else:
-        start = tup[1]
-    if np.isnan(tup[0]):
+        start = tup[0]
+    if np.isnan(tup[1]):
         stop = None
     else:
         stop = tup[1]
@@ -501,14 +501,14 @@ def tuple_to_slice(tup):
 
 
 def generate_bordermask(mask_shape, border_size):
-    """generate a 2d-array of ones with a border of zeros
+    """generate a 2d-array of zeros with a border of ones
 
     Parameters
     ----------
     mask_shape: tuple
         2-tuple corresponding to the output mask shape
     border_size: int
-        width of the border of zeros
+        width of the border of ones
 
     Returns
     -------
