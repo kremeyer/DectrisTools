@@ -4,7 +4,7 @@ tests for the processing module
 from numpy import isnan
 from DectrisTools.lib.processing import slice_to_tuple, tuple_to_slice, filenames_from_logfile, \
     timestamps_from_logfile, delay_from_fname
-from utils import SLICES, TUPLES, LOGFILE
+from .utils import SLICES, TUPLES, LOGFILE
 
 
 def test_slice_to_tuple():
