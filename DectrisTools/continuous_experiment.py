@@ -10,7 +10,7 @@ import numpy as np
 from uedinst.dectris import Quadro
 from uedinst.shutter import SC10Shutter
 from uedinst import ILS250PP
-from . import IP, PORT
+from . import IP, PORT, TIMESTAMP_FORMAT
 
 
 warnings.simplefilter("ignore", ResourceWarning)
@@ -101,7 +101,7 @@ def acquire_image(detector, savedir, scandir, filename):
 
 
 def fmt_log(message):
-    return f"{datetime.now().strftime(r'%Y-%m-%d %H:%M:%S')} | {message}\n"
+    return f"{datetime.now().strftime(TIMESTAMP_FORMAT)} | {message}\n"
 
 
 def run(cmd_args):
