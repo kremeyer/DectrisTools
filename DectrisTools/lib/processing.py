@@ -173,16 +173,16 @@ def process_pump_probe(src, tempdir="tmp", mask=None, border_size=8, discard_fir
     if border_1 > border_2:
         confidence = border_1 / np.max((border_2, 1e-10))
         if discard_first_last_img:
-            pump_on_slice = slice(2, -1, 2)
-            pump_off_slice = slice(1, -2, 2)
+            pump_on_slice = slice(1, -2, 2)
+            pump_off_slice = slice(2, -1, 2)
         else:
             pump_on_slice = slice(0, None, 2)
             pump_off_slice = slice(1, None, 2)
     else:
         confidence = border_2 / np.max((border_1, 1e-10))
         if discard_first_last_img:
-            pump_on_slice = slice(1, -2, 2)
-            pump_off_slice = slice(2, -1, 2)
+            pump_on_slice = slice(2, -1, 2)
+            pump_off_slice = slice(1, -2, 2)
         else:
             pump_on_slice = slice(1, None, 2)
             pump_off_slice = slice(0, None, 2)
@@ -316,6 +316,7 @@ def collect_results(tempdir, result_file):
 
     # allocate memory for final data
     confidence = np.zeros(len(processed_files))
+    delay_file_order = np.zeros(len(processed_files))
     pump_on = np.zeros((len(delays), img_size[0], img_size[1]))
     pump_off = np.zeros((len(delays), img_size[0], img_size[1]))
     sum_ints_pump_on = np.zeros((int(len(processed_files) * n_imgs)))
@@ -341,6 +342,7 @@ def collect_results(tempdir, result_file):
             sum_int_slice = slice(int(file_index * n_imgs), int((file_index + 1) * n_imgs))
             with h5py.File(path.join(tempdir, file), "r") as f:
                 confidence[file_index] = f["confidence"][()]
+                delay_file_order[file_index] = delay_from_fname(str(file))
                 pump_on[delay_index] += f["pump_on/avg_intensities"][()]
                 sum_ints_pump_on[sum_int_slice] = f["pump_on/sum_intensities"][()]
                 histogram_pump_on[delay_index] += f["pump_on/histogram"][()]
@@ -364,6 +366,7 @@ def collect_results(tempdir, result_file):
         f.create_dataset("confidence", data=confidence, **hdf5plugin.Bitshuffle())
         f.create_dataset("mask", data=mask, **hdf5plugin.Bitshuffle())
         f.create_dataset("delays", data=delays, **hdf5plugin.Bitshuffle())
+        f.create_dataset("delay_file_order", data=delay_file_order, **hdf5plugin.Bitshuffle())
         pump_on_group = f.create_group("pump_on")
         pump_off_group = f.create_group("pump_off")
         rois_on_group = pump_on_group.create_group("rois")
