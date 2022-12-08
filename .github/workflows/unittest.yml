@@ -47,6 +47,7 @@ jobs:
         python -m pip install numpy wheel pytest
         python -m pip install git+https://github.com/Siwick-Research-Group/uedinst.git
         python -m pip install -r requirements.txt
+        python setup.py install
     - name: Unit tests
       run: | 
         cd ~
