@@ -4,9 +4,9 @@ all functions are tested for data integriry against their python counterparts an
 """
 from sys import getrefcount
 import numpy as np
-from DectrisTools.lib.computation import masked_histogram as c_masked_histogram
-from DectrisTools.lib.computation import masked_sum as c_masked_sum
-from DectrisTools.lib.computation import normed_sum as c_normed_sum
+from ..lib.computation import masked_histogram as c_masked_histogram
+from ..lib.computation import masked_sum as c_masked_sum
+from ..lib.computation import normed_sum as c_normed_sum
 from .utils import IMAGES, MASK, NORM_VALUES
 
 
