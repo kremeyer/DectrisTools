@@ -1,7 +1,7 @@
 import os
 
 
-VERSION = "0.4"
+VERSION = "0.5"
 IP = "fe80::4ed9:8fff:feca:a8f9"
 PORT = 80
 
