@@ -4,6 +4,7 @@ all functions are tested for data integriry against their python counterparts an
 """
 from sys import getrefcount
 import numpy as np
+from numpy import NaN
 from DectrisTools.lib.computation import masked_histogram as c_masked_histogram
 from DectrisTools.lib.computation import masked_sum as c_masked_sum
 from DectrisTools.lib.computation import normed_sum as c_normed_sum
