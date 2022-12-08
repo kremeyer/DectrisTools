@@ -1,6 +1,7 @@
 from setuptools import setup, find_packages, Extension
 from os.path import join
 from DectrisTools import VERSION
+import numpy
 
 setup(
     name="DectrisTools",
@@ -10,17 +11,19 @@ setup(
         Extension(
             name="DectrisTools.lib.computation",
             sources=[join("DectrisTools", "lib", "computation.c")],
+            include_dirs=[numpy.get_include()],
         )
     ],
     include_package_data=True,
     install_requires=[
         "numpy",
+        "h5py",
+        "hdf5plugin",
         "pyqtgraph",
         "PyQt5",
         "pillow",
         "tqdm",
         "numba",
-        "psutil",
         "uedinst@git+https://github.com/Siwick-Research-Group/uedinst.git",
     ],
     url="https://github.com/kremeyer/DectrisTools",
