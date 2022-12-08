@@ -1,6 +1,7 @@
 from setuptools import setup, find_packages, Extension
 from os.path import join
 from DectrisTools import VERSION
+import numpy
 
 setup(
     name="DectrisTools",
@@ -10,6 +11,7 @@ setup(
         Extension(
             name="DectrisTools.lib.computation",
             sources=[join("DectrisTools", "lib", "computation.c")],
+            include_dirs=[numpy.get_include()],
         )
     ],
     include_package_data=True,
