@@ -48,4 +48,6 @@ jobs:
         python -m pip install git+https://github.com/Siwick-Research-Group/uedinst.git
         python -m pip install -r requirements.txt
     - name: Unit tests
-      run: python -m pytest --pyargs DectrisTools
+      run: | 
+        cd ~
+        python -m pytest --pyargs DectrisTools
