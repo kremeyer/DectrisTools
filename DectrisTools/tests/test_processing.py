@@ -2,7 +2,7 @@
 tests for the processing module
 """
 from numpy import NaN, isnan
-from ..lib.processing import slice_to_tuple, tuple_to_slice
+from DectrisTools.lib.processing import slice_to_tuple, tuple_to_slice
 from .utils import SLICES, TUPLES
 
 
