@@ -7,6 +7,8 @@ from datetime import datetime
 from mpi4py import MPI
 import numpy as np
 from DectrisTools.lib.processing import process_pump_probe
+from DectrisTools import TIMESTAMP_FORMAT
+
 
 comm = MPI.COMM_WORLD
 size = comm.Get_size()
@@ -25,7 +27,7 @@ for i, file in enumerate(filelist):
     if i % size == rank:
         warns = process_pump_probe(file, mask=mask, rois=rois)
         print(
-            f"{datetime.strftime(datetime.now(), '%Y/%m/%d %H:%M:%S')}:\
+            f"{datetime.strftime(datetime.now(), TIMESTAMP_FORMAT)}:\
             rank {rank:03d} processed {file} [{100 * i / len(filelist):.2f}%]"
         )
         for warn in warns:
