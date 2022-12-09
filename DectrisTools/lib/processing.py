@@ -1,7 +1,7 @@
 """
 module for data processing tools
 """
-from os import path, mkdir
+from os import path, mkdir, sep
 from pathlib import Path
 from datetime import datetime
 import numpy as np
@@ -485,7 +485,7 @@ def delay_from_fname(fname):
     float
         time delay
     """
-    return float(fname.split(r"/")[-1][7:17])
+    return float(fname.split(os.sep)[-1][7:17])
 
 
 def filenames_from_logfile(logfile, parent=''):
