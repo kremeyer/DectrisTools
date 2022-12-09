@@ -27,7 +27,7 @@ setup(
         "uedinst@git+https://github.com/Siwick-Research-Group/uedinst.git",
     ],
     url="https://github.com/kremeyer/DectrisTools",
-    license="",
+    license="GNU General Public License v3.0",
     author="Laurenz Kremeyer",
     author_email="laurenz.kremeyer@mail.mcgill.ca",
     description="tools for the Dectris Quadro detector",
