@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  pytest:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
