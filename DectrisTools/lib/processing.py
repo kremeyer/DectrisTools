@@ -485,7 +485,7 @@ def delay_from_fname(fname):
     float
         time delay
     """
-    return float(fname.split(os.sep)[-1][7:17])
+    return float(fname.split(sep)[-1][7:17])
 
 
 def filenames_from_logfile(logfile, parent=''):
