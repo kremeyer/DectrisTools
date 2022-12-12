@@ -122,7 +122,15 @@ class BrokenImageWarning(Warning):
     """warning to throw when encountering broken images"""
 
 
-def process_pump_probe(src, tempdir="tmp", mask=None, border_size=8, discard_first_last_img=True, rois=None, timestamp=None):
+def process_pump_probe(
+    src,
+    tempdir="tmp",
+    mask=None,
+    border_size=8,
+    discard_first_last_img=True,
+    rois=None,
+    timestamp=None,
+):
     """data reduction function to process raw files recorded by the dectris camera into a file of reduced size that is
     to be collected and merged into a full dataset later
 
@@ -167,7 +175,9 @@ def process_pump_probe(src, tempdir="tmp", mask=None, border_size=8, discard_fir
         start_idx = int(f["entry/data/data"].shape[0] / 10)
         stop_idx = start_idx + 100
         border_1 = np.sum(f["entry/data/data"][start_idx:stop_idx:2], axis=0)
-        border_2 = np.sum(f["entry/data/data"][start_idx + 1: stop_idx + 1: 2], axis=0)
+        border_2 = np.sum(
+            f["entry/data/data"][start_idx + 1 : stop_idx + 1 : 2], axis=0
+        )
 
     border_mask = generate_bordermask(mask.shape, border_size)
     border_1 = np.sum(border_1 * border_mask)
@@ -214,10 +224,16 @@ def process_pump_probe(src, tempdir="tmp", mask=None, border_size=8, discard_fir
         for key, val in rois.items():
             if isinstance(val, np.ndarray):
                 sum_ints_rois_pump_on[key] = masked_sum(pump_on_images, val * mask)
-                histogram_rois_pump_on[key] = masked_histogram(pump_on_images, val * mask)
+                histogram_rois_pump_on[key] = masked_histogram(
+                    pump_on_images, val * mask
+                )
             else:
-                sum_ints_rois_pump_on[key] = indexed_masked_sum(pump_on_images, val, mask)
-                histogram_rois_pump_on[key] = indexed_masked_histogram(pump_on_images, val, mask)
+                sum_ints_rois_pump_on[key] = indexed_masked_sum(
+                    pump_on_images, val, mask
+                )
+                histogram_rois_pump_on[key] = indexed_masked_histogram(
+                    pump_on_images, val, mask
+                )
     else:
         warns.append(BrokenImageWarning(f"found broken image in {src}; skipping"))
         return warns
@@ -235,8 +251,12 @@ def process_pump_probe(src, tempdir="tmp", mask=None, border_size=8, discard_fir
                 sum_ints_rois_pump_off[key] = masked_sum(pump_off_images, val)
                 histogram_rois_pump_off[key] = masked_histogram(pump_off_images, val)
             else:
-                sum_ints_rois_pump_off[key] = indexed_masked_sum(pump_off_images, val, mask)
-                histogram_rois_pump_off[key] = indexed_masked_histogram(pump_off_images, val, mask)
+                sum_ints_rois_pump_off[key] = indexed_masked_sum(
+                    pump_off_images, val, mask
+                )
+                histogram_rois_pump_off[key] = indexed_masked_histogram(
+                    pump_off_images, val, mask
+                )
     else:
         warns.append(BrokenImageWarning(f"found broken image in {src}; skipping"))
         return warns
@@ -248,17 +268,29 @@ def process_pump_probe(src, tempdir="tmp", mask=None, border_size=8, discard_fir
         f.create_dataset("mask", data=mask, **hdf5plugin.Bitshuffle())
         f.create_dataset("delay", data=delay_from_fname(src))
         if timestamp:
-            f.create_dataset("timestamp", data=datetime.strftime(timestamp, TIMESTAMP_FORMAT))
-        pump_on_group.create_dataset("avg_intensity", data=pump_on, **hdf5plugin.Bitshuffle())
-        pump_on_group.create_dataset("sum_intensity", data=sum_ints_pump_on, **hdf5plugin.Bitshuffle())
-        pump_on_group.create_dataset("histogram", data=histogram_pump_on, **hdf5plugin.Bitshuffle())
-        pump_off_group.create_dataset("avg_intensity", data=pump_off, **hdf5plugin.Bitshuffle())
+            f.create_dataset(
+                "timestamp", data=datetime.strftime(timestamp, TIMESTAMP_FORMAT)
+            )
+        pump_on_group.create_dataset(
+            "avg_intensity", data=pump_on, **hdf5plugin.Bitshuffle()
+        )
+        pump_on_group.create_dataset(
+            "sum_intensity", data=sum_ints_pump_on, **hdf5plugin.Bitshuffle()
+        )
+        pump_on_group.create_dataset(
+            "histogram", data=histogram_pump_on, **hdf5plugin.Bitshuffle()
+        )
+        pump_off_group.create_dataset(
+            "avg_intensity", data=pump_off, **hdf5plugin.Bitshuffle()
+        )
         pump_off_group.create_dataset(
             "sum_intensity",
             data=sum_ints_pump_off,
             **hdf5plugin.Bitshuffle(),
         )
-        pump_off_group.create_dataset("histogram", data=histogram_pump_off, **hdf5plugin.Bitshuffle())
+        pump_off_group.create_dataset(
+            "histogram", data=histogram_pump_off, **hdf5plugin.Bitshuffle()
+        )
         if rois:
             roi_pump_on_group = pump_on_group.create_group("roi")
             roi_pump_off_group = pump_off_group.create_group("roi")
@@ -324,7 +356,9 @@ def collect_results(tempdir, result_file):
     """
     processed_files = sorted(list(Path(tempdir).rglob("**/*.h5")))
 
-    delays = np.array(sorted(set([delay_from_fname(str(fname)) for fname in processed_files])))
+    delays = np.array(
+        sorted(set([delay_from_fname(str(fname)) for fname in processed_files]))
+    )
 
     # get general info from first temp file
     rois = {}
@@ -351,8 +385,8 @@ def collect_results(tempdir, result_file):
     pump_off = np.zeros((len(delays), img_size[0], img_size[1]))
     sum_ints_pump_on = np.zeros((int(len(processed_files) * n_imgs)))
     sum_ints_pump_off = np.zeros((int(len(processed_files) * n_imgs)))
-    histogram_pump_on = np.zeros((len(delays), 2 ** 16))
-    histogram_pump_off = np.zeros((len(delays), 2 ** 16))
+    histogram_pump_on = np.zeros((len(delays), 2**16))
+    histogram_pump_off = np.zeros((len(delays), 2**16))
     files_per_delay = np.zeros(len(delays))
     sum_ints_rois_pump_on = {}
     sum_ints_rois_pump_off = {}
@@ -361,34 +395,44 @@ def collect_results(tempdir, result_file):
     for key in rois:
         sum_ints_rois_pump_on[key] = np.zeros((int(len(processed_files) * n_imgs)))
         sum_ints_rois_pump_off[key] = np.zeros((int(len(processed_files) * n_imgs)))
-        histograms_rois_pump_on[key] = np.zeros((len(delays), 2 ** 16))
-        histograms_rois_pump_off[key] = np.zeros((len(delays), 2 ** 16))
+        histograms_rois_pump_on[key] = np.zeros((len(delays), 2**16))
+        histograms_rois_pump_off[key] = np.zeros((len(delays), 2**16))
 
     # read temporary files
     for file in processed_files:
         try:
             file_index = processed_files.index(file)
             delay_index = np.where(delays == delay_from_fname(str(file)))[0][0]
-            sum_int_slice = slice(int(file_index * n_imgs), int((file_index + 1) * n_imgs))
+            sum_int_slice = slice(
+                int(file_index * n_imgs), int((file_index + 1) * n_imgs)
+            )
             with h5py.File(path.join(tempdir, file), "r") as f:
                 confidence[file_index] = f["confidence"][()]
                 delay_file_order[file_index] = delay_from_fname(str(file))
-                if 'timestamp' in f:
-                    timestamp.append(f['timestamp'][()])
+                if "timestamp" in f:
+                    timestamp.append(f["timestamp"][()])
                 else:
-                    timestamp.append('')
+                    timestamp.append("")
                 pump_on[delay_index] += f["pump_on/avg_intensity"][()]
                 sum_ints_pump_on[sum_int_slice] = f["pump_on/sum_intensity"][()]
                 histogram_pump_on[delay_index] += f["pump_on/histogram"][()]
                 for key in rois:
-                    sum_ints_rois_pump_on[key][sum_int_slice] = f[f"pump_on/roi/{key}/sum_intensity"][()]
-                    histograms_rois_pump_on[key][delay_index] += f[f"pump_on/roi/{key}/histogram"][()]
+                    sum_ints_rois_pump_on[key][sum_int_slice] = f[
+                        f"pump_on/roi/{key}/sum_intensity"
+                    ][()]
+                    histograms_rois_pump_on[key][delay_index] += f[
+                        f"pump_on/roi/{key}/histogram"
+                    ][()]
                 pump_off[delay_index] += f["pump_off/avg_intensity"][()]
                 sum_ints_pump_off[sum_int_slice] = f["pump_off/sum_intensity"][()]
                 histogram_pump_off[delay_index] += f["pump_off/histogram"][()]
                 for key in rois:
-                    sum_ints_rois_pump_off[key][sum_int_slice] = f[f"pump_off/roi/{key}/sum_intensity"][()]
-                    histograms_rois_pump_off[key][delay_index] += f[f"pump_on/roi/{key}/histogram"][()]
+                    sum_ints_rois_pump_off[key][sum_int_slice] = f[
+                        f"pump_off/roi/{key}/sum_intensity"
+                    ][()]
+                    histograms_rois_pump_off[key][delay_index] += f[
+                        f"pump_on/roi/{key}/histogram"
+                    ][()]
             files_per_delay[delay_index] += 1
         except (BlockingIOError, OSError, KeyError):
             continue
@@ -400,15 +444,23 @@ def collect_results(tempdir, result_file):
         f.create_dataset("confidence", data=confidence, **hdf5plugin.Bitshuffle())
         f.create_dataset("mask", data=mask, **hdf5plugin.Bitshuffle())
         f.create_dataset("delay", data=delays, **hdf5plugin.Bitshuffle())
-        f.create_dataset("delay_file_order", data=delay_file_order, **hdf5plugin.Bitshuffle())
+        f.create_dataset(
+            "delay_file_order", data=delay_file_order, **hdf5plugin.Bitshuffle()
+        )
         f.create_dataset("timestamp", data=timestamp)
         pump_on_group = f.create_group("pump_on")
         pump_off_group = f.create_group("pump_off")
         rois_on_group = pump_on_group.create_group("roi")
         rois_off_group = pump_off_group.create_group("roi")
-        pump_on_group.create_dataset("avg_intensity", data=pump_on, **hdf5plugin.Bitshuffle())
-        pump_on_group.create_dataset("sum_intensity", data=sum_ints_pump_on, **hdf5plugin.Bitshuffle())
-        pump_on_group.create_dataset("histogram", data=histogram_pump_on, **hdf5plugin.Bitshuffle())
+        pump_on_group.create_dataset(
+            "avg_intensity", data=pump_on, **hdf5plugin.Bitshuffle()
+        )
+        pump_on_group.create_dataset(
+            "sum_intensity", data=sum_ints_pump_on, **hdf5plugin.Bitshuffle()
+        )
+        pump_on_group.create_dataset(
+            "histogram", data=histogram_pump_on, **hdf5plugin.Bitshuffle()
+        )
         for key, val in rois.items():
             key_group = rois_on_group.create_group(key)
             key_group.create_dataset(
@@ -424,10 +476,18 @@ def collect_results(tempdir, result_file):
             if isinstance(val, np.ndarray):
                 key_group.create_dataset("mask", data=val, **hdf5plugin.Bitshuffle())
             else:
-                key_group.create_dataset("slice", data=(slice_to_tuple(val[0]), slice_to_tuple(val[1])))
-        pump_off_group.create_dataset("avg_intensity", data=pump_off, **hdf5plugin.Bitshuffle())
-        pump_off_group.create_dataset("sum_intensity", data=sum_ints_pump_off, **hdf5plugin.Bitshuffle())
-        pump_off_group.create_dataset("histogram", data=histogram_pump_off, **hdf5plugin.Bitshuffle())
+                key_group.create_dataset(
+                    "slice", data=(slice_to_tuple(val[0]), slice_to_tuple(val[1]))
+                )
+        pump_off_group.create_dataset(
+            "avg_intensity", data=pump_off, **hdf5plugin.Bitshuffle()
+        )
+        pump_off_group.create_dataset(
+            "sum_intensity", data=sum_ints_pump_off, **hdf5plugin.Bitshuffle()
+        )
+        pump_off_group.create_dataset(
+            "histogram", data=histogram_pump_off, **hdf5plugin.Bitshuffle()
+        )
         for key, val in rois.items():
             key_group = rois_off_group.create_group(key)
             key_group.create_dataset(
@@ -443,7 +503,9 @@ def collect_results(tempdir, result_file):
             if isinstance(val, np.ndarray):
                 key_group.create_dataset("mask", data=val, **hdf5plugin.Bitshuffle())
             else:
-                key_group.create_dataset("slice", data=(slice_to_tuple(val[0]), slice_to_tuple(val[1])))
+                key_group.create_dataset(
+                    "slice", data=(slice_to_tuple(val[0]), slice_to_tuple(val[1]))
+                )
 
 
 def check_image_integrity(images, mask):
@@ -488,7 +550,7 @@ def delay_from_fname(fname):
     return float(fname.split(r"/")[-1][7:17])
 
 
-def filenames_from_logfile(logfile, parent=''):
+def filenames_from_logfile(logfile, parent=""):
     """parse a log file and return a list of all files stored during the experiment
 
     Parameters
@@ -504,13 +566,19 @@ def filenames_from_logfile(logfile, parent=''):
         list of filepaths with parent directory prepended
     """
     files = []
-    with open(logfile, 'r') as log:
+    with open(logfile, "r") as log:
         log = log.readlines()
         for line in log:
-            if 'pump on image series' in line:
-                scan = int(line.split('and time')[0].split('scan')[-1].replace(' ', ''))
-                delay = float(line.split('ps')[0].split('time-delay')[-1].replace(' ', ''))
-                files.append(path.join(parent, f'scan_{scan:04d}', f'pumpon_{delay:+010.3f}ps.h5'))
+            if "pump on image series" in line:
+                scan = int(line.split("and time")[0].split("scan")[-1].replace(" ", ""))
+                delay = float(
+                    line.split("ps")[0].split("time-delay")[-1].replace(" ", "")
+                )
+                files.append(
+                    path.join(
+                        parent, f"scan_{scan:04d}", f"pumpon_{delay:+010.3f}ps.h5"
+                    )
+                )
     return files
 
 
@@ -528,11 +596,11 @@ def timestamps_from_logfile(logfile):
         list of timestamps
     """
     timestamps = []
-    with open(logfile, 'r') as log:
+    with open(logfile, "r") as log:
         log = log.readlines()
         for line in log:
-            if 'pump on image series' in line:
-                timestamp = datetime.strptime(line.split(' |')[0], TIMESTAMP_FORMAT)
+            if "pump on image series" in line:
+                timestamp = datetime.strptime(line.split(" |")[0], TIMESTAMP_FORMAT)
                 timestamps.append(timestamp)
     return timestamps
 
@@ -605,17 +673,17 @@ def convert_to_iris(src, dest):
     dest: str
         output file
     """
-    with h5py.File(src, 'r') as f:
-        intensity = f['pump_on/avg_intensity'][()]
+    with h5py.File(src, "r") as f:
+        intensity = f["pump_on/avg_intensity"][()]
         intensity = np.moveaxis(intensity, 0, -1)  # iris-ued axis order is different
-        time_points = f['delay'][()]
-        valid_mask = f['mask'][()]
+        time_points = f["delay"][()]
+        valid_mask = f["mask"][()]
 
-    with h5py.File(dest, 'x') as f:
-        processed_group = f.create_group('processed')
-        processed_group.create_dataset('intensity', data=intensity)
-        f.create_dataset('time_points', data=time_points)
-        f.create_dataset('valid_mask', data=valid_mask)
+    with h5py.File(dest, "x") as f:
+        processed_group = f.create_group("processed")
+        processed_group.create_dataset("intensity", data=intensity)
+        f.create_dataset("time_points", data=time_points)
+        f.create_dataset("valid_mask", data=valid_mask)
 
 
 def generate_bordermask(mask_shape, border_size):
