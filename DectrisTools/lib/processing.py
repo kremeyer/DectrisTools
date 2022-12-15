@@ -381,6 +381,7 @@ def collect_results(tempdir, result_file):
     confidence = np.zeros(len(processed_files))
     delay_file_order = np.zeros(len(processed_files))
     timestamp = []
+    filename = []
     pump_on = np.zeros((len(delays), img_size[0], img_size[1]))
     pump_off = np.zeros((len(delays), img_size[0], img_size[1]))
     sum_ints_pump_on = np.zeros((int(len(processed_files) * n_imgs)))
@@ -434,6 +435,7 @@ def collect_results(tempdir, result_file):
                         f"pump_on/roi/{key}/histogram"
                     ][()]
             files_per_delay[delay_index] += 1
+            filename.append(str(file))
         except (BlockingIOError, OSError, KeyError):
             continue
     pump_on /= files_per_delay[:, None, None]
@@ -444,6 +446,7 @@ def collect_results(tempdir, result_file):
         f.create_dataset("confidence", data=confidence, **hdf5plugin.Bitshuffle())
         f.create_dataset("mask", data=mask, **hdf5plugin.Bitshuffle())
         f.create_dataset("delay", data=delays, **hdf5plugin.Bitshuffle())
+        f.create_dataset("filename", data=filename)
         f.create_dataset(
             "delay_file_order", data=delay_file_order, **hdf5plugin.Bitshuffle()
         )
