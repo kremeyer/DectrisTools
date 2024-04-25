@@ -1,5 +1,5 @@
 import warnings
-from sys.stdout import flush
+import sys
 from argparse import ArgumentParser
 from random import shuffle
 from time import sleep, time
@@ -9,8 +9,9 @@ from os import rename, path, getcwd, mkdir
 import numpy as np
 from uedinst.dectris import Quadro
 from uedinst.shutter import SC10Shutter
-from uedinst import ILS250PP
-from . import IP, PORT, TIMESTAMP_FORMAT
+from uedinst.delay_stage import move_stages_to_time, XPSController
+from uedinst import InstrumentException
+from . import IP, PORT
 
 
 warnings.simplefilter("ignore", ResourceWarning)
@@ -18,7 +19,7 @@ warnings.simplefilter("ignore", ResourceWarning)
 DIR_PUMP_OFF = "pump_off"
 DIR_LASER_BG = "laser_background"
 DIR_DARK = "dark_image"
-T0_POS = 27.1083
+T0_POS = 100
 
 
 def parse_args():
@@ -28,25 +29,27 @@ def parse_args():
     parser.add_argument(
         "--pump_shutter_port",
         type=str,
-        default="COM22",
+        default="COM27",
         help="com port of the shutter controller for the pump shutter",
     )
     parser.add_argument(
         "--probe_shutter_port",
         type=str,
-        default="COM20",
+        default="COM17",
         help="com port of the shutter controller for the probe shutter",
     )
     parser.add_argument(
         "--delay_stage_ip",
         type=str,
-        default="192.168.254.254",
+        default="172.25.12.14",
         help="ip address of the delay stage",
     )
     parser.add_argument("--savedir", type=str, help="save directory")
     parser.add_argument("--n_scans", type=int, help="number of scans")
     parser.add_argument("--delays", type=str)
-    parser.add_argument("--exposure", type=float, default=30, help="exposure time of each image")
+    parser.add_argument(
+        "--exposure", type=float, default=30, help="exposure time of each image"
+    )
     args = parser.parse_args()
     return args
 
@@ -101,7 +104,12 @@ def acquire_image(detector, savedir, scandir, filename):
 
 
 def fmt_log(message):
-    return f"{datetime.now().strftime(TIMESTAMP_FORMAT)} | {message}\n"
+    return f"{datetime.now().strftime(r'%Y-%m-%d %H:%M:%S')} | {message}\n"
+
+
+def append_to_log(logfile, msg):
+    with open(logfile, "a") as f:
+        f.write(msg)
 
 
 def run(cmd_args):
@@ -128,12 +136,18 @@ def run(cmd_args):
     s_probe = SC10Shutter(args.probe_shutter_port)
     s_probe.set_operating_mode("manual")
 
-    delay_stage = ILS250PP(cmd_args.delay_stage_ip)
+    xps = XPSController(cmd_args.delay_stage_ip)
 
     # start experiment
-    logfile = open(path.join(savedir, "experiment.log"), "w+")
-    logfile.write(fmt_log(f"starting experiment with {cmd_args.n_scans} scans at {len(delays)} delays"))
-    flush()
+    log_filename = path.join(savedir, "experiment.log")
+    logfile = open(log_filename, "w+")
+    logfile.write(
+        fmt_log(
+            f"starting experiment with {cmd_args.n_scans} scans at {len(delays)} delays"
+        )
+    )
+    logfile.close()
+    sys.stdout.flush()
     try:
         mkdir(path.join(savedir, DIR_LASER_BG))
         mkdir(path.join(savedir, DIR_PUMP_OFF))
@@ -142,55 +156,72 @@ def run(cmd_args):
             s_pump.enable(False)
             s_probe.enable(False)
             while True:
-                exception = acquire_image(Q, savedir, DIR_LASER_BG, f"dark_epoch_{time():010.0f}s.tif")
+                exception = acquire_image(
+                    Q, savedir, DIR_DARK, f"dark_epoch_{time():010.0f}s.h5"
+                )
                 if exception:
-                    logfile.write(fmt_log(str(exception)))
+                    append_to_log(log_filename, fmt_log(str(exception)))
                 else:
                     break
             s_pump.enable(True)
             s_probe.enable(False)
             while True:
-                exception = acquire_image(Q, savedir, DIR_LASER_BG, f"laser_bg_epoch_{time():010.0f}s.tif")
+                exception = acquire_image(
+                    Q, savedir, DIR_LASER_BG, f"laser_bg_epoch_{time():010.0f}s.h5"
+                )
                 if exception:
-                    logfile.write(fmt_log(str(exception)))
+                    append_to_log(log_filename, fmt_log(str(exception)))
                 else:
                     break
-            logfile.write(fmt_log("laser background image acquired"))
+            append_to_log(log_filename, fmt_log("laser background image acquired"))
             s_pump.enable(False)
             s_probe.enable(True)
             while True:
-                exception = acquire_image(Q, savedir, DIR_PUMP_OFF, f"pump_off_epoch_{time():010.0f}s.tif")
+                exception = acquire_image(
+                    Q, savedir, DIR_PUMP_OFF, f"pump_off_epoch_{time():010.0f}s.h5"
+                )
                 if exception:
-                    logfile.write(fmt_log(str(exception)))
+                    append_to_log(log_filename, fmt_log(str(exception)))
                 else:
                     break
-            logfile.write(fmt_log("pump off image acquired"))
+            append_to_log(log_filename, fmt_log("pump off image acquired"))
             s_pump.enable(True)
 
             scandir = f"scan_{i+1:04d}"
             mkdir(path.join(savedir, scandir))
             shuffle(delays)
             for delay in tqdm(delays, leave=False, desc="delay steps"):
-                filename = f"pumpon_{delay:+010.3f}ps.tif"
+                filename = f"pumpon_{delay:+010.3f}ps.h5"
 
-                delay_stage.absolute_time(delay, T0_POS)
-                delay_stage._wait_end_of_move()
+                try:
+                    move_stages_to_time(xps, delay, T0_POS)
+                except InstrumentException:
+                    xps._driver.GroupKill(xps.socket_id, "UED")
+                    xps._driver.GroupInitialize(xps.socket_id, "UED")
+                    xps._driver.GroupHomeSearch(xps.socket_id, "UED")
+                    move_stages_to_time(xps, delay, T0_POS)
+                xps.delay_stage._wait_end_of_move()
                 while True:
                     exception = acquire_image(Q, savedir, scandir, filename)
                     if exception:
-                        logfile.write(fmt_log(str(exception)))
+                        append_to_log(log_filename, fmt_log(str(exception)))
                     else:
                         break
-                logfile.write(fmt_log(f"pump on image acquired at scan {i+1} and time-delay {delay:.1f}ps"))
-                flush()
+                append_to_log(
+                    log_filename,
+                    fmt_log(
+                        f"pump on image acquired at scan {i+1} and time-delay {delay:.1f}ps"
+                    ),
+                )
+                sys.stdout.flush()
 
         s_pump.enable(False)
         s_probe.enable(False)
-        logfile.write(fmt_log("EXPERIMENT COMPLETE"))
+        append_to_log(log_filename, fmt_log("EXPERIMENT COMPLETE"))
         logfile.close()
         print("🍻")
     except Exception as e:
-        logfile.write(fmt_log(str(e)))
+        append_to_log(log_filename, fmt_log(str(e)))
         logfile.close()
         raise e
 
